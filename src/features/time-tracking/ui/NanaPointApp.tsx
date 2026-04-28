@@ -245,6 +245,14 @@ function AuthScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  function getEmailRedirectTo() {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    return `${window.location.origin}/`;
+  }
+
   async function submit() {
     if (!hasSupabaseConfig()) {
       setError("O acesso ainda não está disponível. Tente novamente mais tarde.");
@@ -273,6 +281,7 @@ function AuthScreen() {
         email: normalizedEmail,
         password,
         options: {
+          emailRedirectTo: getEmailRedirectTo(),
           data: {
             display_name: name.trim() || normalizedEmail.split("@")[0],
           },
