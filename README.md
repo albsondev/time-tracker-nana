@@ -13,7 +13,7 @@ Nana's Point e um app web mobile-first para controle pessoal de ponto, pausas e 
 
 ## Funcionalidades do MVP
 
-- Login com Google ou Apple via Supabase Auth quando as variaveis estiverem configuradas.
+- Login e cadastro com e-mail/senha via Supabase Auth quando as variaveis estiverem configuradas.
 - Login obrigatorio com Supabase; sem variaveis de ambiente o app bloqueia entrada.
 - Tela "Hoje" com status do dia, horas trabalhadas, pausas e banco de horas.
 - Registro de ponto com selecao de horario e observacao opcional.
@@ -71,7 +71,7 @@ supabase link --project-ref <project-ref>
 supabase db push
 ```
 
-Tambem sera necessario habilitar os provedores Google e Apple no painel do Supabase Auth.
+Tambem sera necessario manter o provedor de e-mail habilitado no painel do Supabase Auth.
 
 ## Scripts
 

@@ -23,7 +23,12 @@ describe("NanaPointApp", () => {
     renderApp();
 
     expect(await screen.findByText("Nana's Point")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /entrar com google/i })).toBeDisabled();
+    expect(screen.getByLabelText(/e-mail/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/senha/i)).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /^entrar$/i }).some((button) => button.hasAttribute("disabled")),
+    ).toBe(true);
+    expect(screen.getByRole("button", { name: /criar cadastro/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /modo/i })).not.toBeInTheDocument();
     expect(screen.getByText(/o acesso ainda não está disponível/i)).toBeInTheDocument();
   });

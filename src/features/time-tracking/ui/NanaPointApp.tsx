@@ -92,9 +92,7 @@ export function NanaPointApp() {
   const transition = shouldReduceMotion ? { duration: 0 } : springy;
 
   useEffect(() => {
-    if (!hasSupabaseConfig()) {
-      return;
-    }
+    if (!hasSupabaseConfig()) return;
 
     const client = getSupabaseBrowserClient();
 
@@ -126,7 +124,7 @@ export function NanaPointApp() {
   }
 
   if (!session) {
-    return <LoginScreen />;
+    return <AuthScreen />;
   }
 
   return (
@@ -201,14 +199,63 @@ function CenteredLoading({ label }: { label: string }) {
   );
 }
 
-function LoginScreen() {
-  async function login(provider: "google" | "apple") {
-    if (!hasSupabaseConfig()) return;
+function AuthScreen() {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-    await getSupabaseBrowserClient().auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: window.location.origin },
-    });
+  async function submit() {
+    if (!hasSupabaseConfig()) {
+      setError("O acesso ainda não está disponível. Tente novamente mais tarde.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    setFeedback(null);
+
+    const client = getSupabaseBrowserClient();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    try {
+      if (mode === "login") {
+        const { error: authError } = await client.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+
+        if (authError) throw authError;
+        return;
+      }
+
+      const { error: signUpError } = await client.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: {
+            display_name: name.trim() || normalizedEmail.split("@")[0],
+          },
+        },
+      });
+
+      if (signUpError) throw signUpError;
+
+      setFeedback(
+        "Cadastro criado. Se aparecer uma confirmação por e-mail, é só confirmar para entrar.",
+      );
+    } catch (unknownError) {
+      const message =
+        unknownError instanceof Error
+          ? unknownError.message
+          : "Não foi possível concluir. Confira os dados e tente novamente.";
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -240,29 +287,71 @@ function LoginScreen() {
                 banco de horas com tranquilidade.
               </Typography>
             </Box>
+
+            <Stack direction="row" spacing={1}>
+              <Button
+                fullWidth
+                variant={mode === "login" ? "contained" : "outlined"}
+                onClick={() => setMode("login")}
+              >
+                Entrar
+              </Button>
+              <Button
+                fullWidth
+                variant={mode === "signup" ? "contained" : "outlined"}
+                onClick={() => setMode("signup")}
+              >
+                Criar cadastro
+              </Button>
+            </Stack>
+
             <Stack spacing={1.5}>
+              {mode === "signup" && (
+                <TextField
+                  label="Nome"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  autoComplete="name"
+                  fullWidth
+                />
+              )}
+              <TextField
+                label="E-mail"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                fullWidth
+              />
+              <TextField
+                label="Senha"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                helperText={mode === "signup" ? "Use pelo menos 6 caracteres." : undefined}
+                fullWidth
+              />
+              {error && <Alert severity="error">{error}</Alert>}
+              {feedback && <Alert severity="success">{feedback}</Alert>}
+              {!hasSupabaseConfig() && (
+                <Alert severity="warning">
+                  O acesso ainda não está disponível. Tente novamente mais tarde.
+                </Alert>
+              )}
               <Button
                 size="large"
                 variant="contained"
-                disabled={!hasSupabaseConfig()}
-                onClick={() => login("google")}
+                disabled={!email || !password || isSubmitting || !hasSupabaseConfig()}
+                onClick={submit}
               >
-                Entrar com Google
-              </Button>
-              <Button
-                size="large"
-                variant="outlined"
-                disabled={!hasSupabaseConfig()}
-                onClick={() => login("apple")}
-              >
-                Entrar com Apple
+                {isSubmitting
+                  ? "Aguarde..."
+                  : mode === "login"
+                    ? "Entrar"
+                    : "Criar minha conta"}
               </Button>
             </Stack>
-            {!hasSupabaseConfig() && (
-              <Alert severity="warning">
-                O acesso ainda não está disponível. Tente novamente mais tarde.
-              </Alert>
-            )}
           </Stack>
         </CardContent>
       </MotionCard>
