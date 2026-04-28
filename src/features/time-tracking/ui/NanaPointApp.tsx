@@ -163,7 +163,7 @@ export function NanaPointApp() {
         pb: 11,
       }}
     >
-      <Container maxWidth="sm" sx={{ px: 2, py: 2.5 }}>
+      <Container maxWidth="sm" sx={{ px: { xs: 1.25, sm: 2 }, py: { xs: 1.75, sm: 2.5 } }}>
         <AppHeader
           bankBalance={tracker.hourBankBalance}
           displayName={displayName}
@@ -776,18 +776,32 @@ function BottomAppNavigation({
       position="fixed"
       color="transparent"
       elevation={0}
-      sx={{ top: "auto", bottom: 0, p: 1.5, backdropFilter: "blur(18px)" }}
+      sx={{ top: "auto", bottom: 0, p: { xs: 1, sm: 1.5 }, backdropFilter: "blur(18px)" }}
     >
       <BottomNavigation
         value={tab}
         onChange={(_, next) => onChange(next)}
         showLabels
         sx={{
+          width: "100%",
           maxWidth: 520,
           mx: "auto",
           borderRadius: 999,
           border: `1px solid ${nanaColors.line}`,
           boxShadow: "0 16px 40px rgba(64, 42, 12, 0.14)",
+          px: { xs: 0.5, sm: 1 },
+          "& .MuiBottomNavigationAction-root": {
+            minWidth: 0,
+            maxWidth: "none",
+            px: { xs: 0.4, sm: 1 },
+            py: { xs: 0.5, sm: 0.75 },
+          },
+          "& .MuiBottomNavigationAction-label": {
+            fontSize: { xs: "0.62rem", sm: "0.72rem" },
+          },
+          "& .MuiSvgIcon-root": {
+            fontSize: { xs: "1.15rem", sm: "1.35rem" },
+          },
         }}
       >
         <BottomNavigationAction label="Hoje" value="today" icon={<HomeRoundedIcon />} />
