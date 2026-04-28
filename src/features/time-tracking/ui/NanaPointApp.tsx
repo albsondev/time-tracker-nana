@@ -231,13 +231,13 @@ function LoginScreen() {
         <CardContent sx={{ p: 4 }}>
           <Stack spacing={3}>
             <Box>
-              <Chip label="Dados reais via Supabase" color="secondary" />
+              <Chip label="Seu ponto com segurança" color="secondary" />
               <Typography variant="h3" sx={{ mt: 2 }}>
                 Nana&apos;s Point
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 1 }}>
-                Entre para registrar seus pontos, pausas e banco de horas direto no
-                Supabase.
+                Entre para registrar seus horários, acompanhar pausas e cuidar do seu
+                banco de horas com tranquilidade.
               </Typography>
             </Box>
             <Stack spacing={1.5}>
@@ -260,7 +260,7 @@ function LoginScreen() {
             </Stack>
             {!hasSupabaseConfig() && (
               <Alert severity="warning">
-                Configure o `.env.local` para usar autenticação e dados reais.
+                O acesso ainda não está disponível. Tente novamente mais tarde.
               </Alert>
             )}
           </Stack>
@@ -550,7 +550,7 @@ function ProfileView({
 }) {
   return (
     <Stack spacing={2}>
-      <SectionTitle title="Perfil e ajustes" subtitle="Preferências do MVP" />
+      <SectionTitle title="Perfil e ajustes" subtitle="Preferências da conta" />
       <Card>
         <CardContent sx={{ p: 3 }}>
           <Stack spacing={2}>
@@ -558,8 +558,8 @@ function ProfileView({
               Meta semanal fixa: <strong>30 horas</strong>.
             </Typography>
             <Typography color="text.secondary">
-              Sessão Supabase ativa para {session?.user.email ?? "usuário autenticado"}.
-              Os dados exibidos vêm das tabelas reais protegidas por RLS.
+              Você está conectada como {session?.user.email ?? "usuária autenticada"}.
+              Seus registros ficam vinculados à sua conta.
             </Typography>
             <Button variant="outlined" color="secondary" onClick={onLogout}>
               Sair

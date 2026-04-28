@@ -16,7 +16,7 @@ describe("NanaPointApp", () => {
     vi.unstubAllEnvs();
   });
 
-  it("shows the real Supabase login screen without local bypass access", async () => {
+  it("shows the user-facing login screen without local bypass access", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "");
 
@@ -25,6 +25,6 @@ describe("NanaPointApp", () => {
     expect(await screen.findByText("Nana's Point")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /entrar com google/i })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /modo/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/configure o `.env.local`/i)).toBeInTheDocument();
+    expect(screen.getByText(/o acesso ainda não está disponível/i)).toBeInTheDocument();
   });
 });
