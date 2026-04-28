@@ -1,11 +1,28 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BreakEntry, HourBankMovement, TimeEntry } from "@/domain/time/types";
 
+export type UserProfile = {
+  id: string;
+  displayName: string | null;
+};
+
 export type TimeTrackingSnapshot = {
   entries: TimeEntry[];
   breaks: BreakEntry[];
   movements: HourBankMovement[];
 };
+
+export async function upsertUserProfile(
+  supabase: SupabaseClient,
+  profile: UserProfile,
+) {
+  const { error } = await supabase.from("profiles").upsert({
+    id: profile.id,
+    display_name: profile.displayName,
+  });
+
+  if (error) throw error;
+}
 
 export async function loadUserTimeTrackingSnapshot(
   supabase: SupabaseClient,

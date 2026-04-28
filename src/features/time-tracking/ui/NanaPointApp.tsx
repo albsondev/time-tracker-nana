@@ -43,6 +43,7 @@ import type { BreakCategory, TimeEntry } from "@/domain/time/types";
 import { getSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { fadeUp, springy, staggerContainer } from "@/shared/motion/presets";
 import { nanaColors } from "@/shared/theme/nana-theme";
+import { upsertUserProfile } from "../data/time-tracking-repository";
 import { useTimeTracker } from "../model/use-time-tracker";
 
 type Tab = "today" | "calendar" | "bank" | "history" | "profile";
@@ -75,6 +76,21 @@ const breakLabels: Record<BreakCategory, string> = {
 };
 
 const MotionCard = motion(Card);
+
+function getDisplayName(session: Session | null) {
+  const metadataName = session?.user.user_metadata?.display_name;
+
+  if (typeof metadataName === "string" && metadataName.trim().length > 0) {
+    return metadataName.trim();
+  }
+
+  const emailName = session?.user.email?.split("@")[0];
+  return emailName || "usuária";
+}
+
+function getFirstName(name: string) {
+  return name.trim().split(/\s+/)[0] || name;
+}
 
 export function NanaPointApp() {
   const [tab, setTab] = useState<Tab>("today");
@@ -111,6 +127,15 @@ export function NanaPointApp() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!supabase || !session) return;
+
+    void upsertUserProfile(supabase, {
+      id: session.user.id,
+      displayName: getDisplayName(session),
+    });
+  }, [session, supabase]);
+
   async function logout() {
     if (hasSupabaseConfig()) {
       await getSupabaseBrowserClient().auth.signOut();
@@ -127,6 +152,8 @@ export function NanaPointApp() {
     return <AuthScreen />;
   }
 
+  const displayName = getDisplayName(session);
+
   return (
     <Box
       sx={{
@@ -137,7 +164,7 @@ export function NanaPointApp() {
       }}
     >
       <Container maxWidth="sm" sx={{ px: 2, py: 2.5 }}>
-        <AppHeader bankBalance={tracker.hourBankBalance} />
+        <AppHeader bankBalance={tracker.hourBankBalance} displayName={displayName} />
 
         <AnimatePresence mode="wait">
           <motion.main
@@ -158,7 +185,13 @@ export function NanaPointApp() {
             {tab === "calendar" && <CalendarView tracker={tracker} />}
             {tab === "bank" && <HourBankView tracker={tracker} />}
             {tab === "history" && <HistoryView tracker={tracker} />}
-            {tab === "profile" && <ProfileView session={session} onLogout={logout} />}
+            {tab === "profile" && (
+              <ProfileView
+                displayName={displayName}
+                session={session}
+                onLogout={logout}
+              />
+            )}
           </motion.main>
         </AnimatePresence>
       </Container>
@@ -359,14 +392,20 @@ function AuthScreen() {
   );
 }
 
-function AppHeader({ bankBalance }: { bankBalance: number }) {
+function AppHeader({
+  bankBalance,
+  displayName,
+}: {
+  bankBalance: number;
+  displayName: string;
+}) {
   return (
     <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 2 }}>
       <Box>
         <Typography variant="overline" color="text.secondary">
           Nana&apos;s Point
         </Typography>
-        <Typography variant="h5">Olá, Nana</Typography>
+        <Typography variant="h5">Olá, {getFirstName(displayName)}</Typography>
       </Box>
       <Chip
         icon={<SavingsRoundedIcon />}
@@ -631,9 +670,11 @@ function HistoryView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }
 }
 
 function ProfileView({
+  displayName,
   session,
   onLogout,
 }: {
+  displayName: string;
   session: Session | null;
   onLogout: () => void;
 }) {
@@ -645,6 +686,9 @@ function ProfileView({
           <Stack spacing={2}>
             <Typography>
               Meta semanal fixa: <strong>30 horas</strong>.
+            </Typography>
+            <Typography>
+              Nome: <strong>{displayName}</strong>
             </Typography>
             <Typography color="text.secondary">
               Você está conectada como {session?.user.email ?? "usuária autenticada"}.
