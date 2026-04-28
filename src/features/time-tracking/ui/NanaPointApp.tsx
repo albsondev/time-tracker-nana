@@ -30,7 +30,7 @@ import {
   Typography,
 } from "@mui/material";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { minutesToDecimalHours, minutesToHoursLabel, formatDatePtBr, formatMonthPtBr } from "@/domain/time/format";
 import type { BreakCategory, TimeEntry } from "@/domain/time/types";
 import { hasSupabaseConfig, getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -73,14 +73,48 @@ export function NanaPointApp() {
   const tracker = useTimeTracker();
   const [tab, setTab] = useState<Tab>("today");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
   const [breakDialogOpen, setBreakDialogOpen] = useState(false);
   const shouldReduceMotion = useReducedMotion();
 
   const transition = shouldReduceMotion ? { duration: 0 } : springy;
 
+  useEffect(() => {
+    if (!hasSupabaseConfig()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    supabase.auth.getSession().then(({ data }) => {
+      setIsAuthenticated(Boolean(data.session));
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(Boolean(session));
+      setIsDemo(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  function enterDemo() {
+    setIsDemo(true);
+    setIsAuthenticated(true);
+  }
+
+  async function logout() {
+    if (hasSupabaseConfig() && !isDemo) {
+      await getSupabaseBrowserClient().auth.signOut();
+    }
+
+    setIsDemo(false);
+    setIsAuthenticated(false);
+  }
+
   if (!isAuthenticated) {
-    return <LoginScreen onDemo={() => setIsAuthenticated(true)} />;
+    return <LoginScreen onDemo={enterDemo} />;
   }
 
   return (
@@ -114,7 +148,7 @@ export function NanaPointApp() {
             {tab === "calendar" && <CalendarView tracker={tracker} />}
             {tab === "bank" && <HourBankView tracker={tracker} />}
             {tab === "history" && <HistoryView tracker={tracker} />}
-            {tab === "profile" && <ProfileView onLogout={() => setIsAuthenticated(false)} />}
+            {tab === "profile" && <ProfileView isDemo={isDemo} onLogout={logout} />}
           </motion.main>
         </AnimatePresence>
       </Container>
@@ -465,7 +499,7 @@ function HistoryView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }
   );
 }
 
-function ProfileView({ onLogout }: { onLogout: () => void }) {
+function ProfileView({ isDemo, onLogout }: { isDemo: boolean; onLogout: () => void }) {
   return (
     <Stack spacing={2}>
       <SectionTitle title="Perfil e ajustes" subtitle="Preferências do MVP" />
@@ -476,8 +510,9 @@ function ProfileView({ onLogout }: { onLogout: () => void }) {
               Meta semanal fixa: <strong>30 horas</strong>.
             </Typography>
             <Typography color="text.secondary">
-              Login real, dados persistentes e RLS ficam ativos quando as variáveis do
-              Supabase forem configuradas.
+              {isDemo
+                ? "Você está navegando com dados demo. Configure o Supabase para login real e persistência."
+                : "Sessão Supabase ativa. As tabelas e políticas RLS ficam definidas nas migrations do projeto."}
             </Typography>
             <Button variant="outlined" color="secondary" onClick={onLogout}>
               Sair do modo demo
