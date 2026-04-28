@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   calculateHourBankBalance,
   getNextEntryType,
   summarizeDay,
   summarizeWeek,
 } from "@/domain/time/calculations";
-import { demoBreaks, demoEntries, demoHourBankMovements } from "@/domain/time/fixtures";
 import { toDateKey } from "@/domain/time/format";
 import type {
   BreakCategory,
@@ -17,11 +17,15 @@ import type {
   HourBankMovement,
   TimeEntry,
 } from "@/domain/time/types";
-
-const demoToday = new Date("2026-04-28T16:20:00-03:00");
-const userId = "demo-user";
+import {
+  createBreakEntry,
+  createTimeEntry,
+  loadUserTimeTrackingSnapshot,
+} from "../data/time-tracking-repository";
 
 export type TimeTrackerState = ReturnType<typeof useTimeTracker>;
+
+type LoadingState = "idle" | "loading" | "ready" | "error";
 
 function getMonthDays(date: Date) {
   const year = date.getFullYear();
@@ -31,6 +35,20 @@ function getMonthDays(date: Date) {
   return Array.from({ length: days }, (_, index) => {
     const day = new Date(year, month, index + 1, 12);
     return toDateKey(day);
+  });
+}
+
+function getWeekDays(date: Date) {
+  const current = new Date(date);
+  const day = current.getDay();
+  const distanceFromMonday = day === 0 ? 6 : day - 1;
+  current.setDate(current.getDate() - distanceFromMonday);
+  current.setHours(12, 0, 0, 0);
+
+  return Array.from({ length: 5 }, (_, index) => {
+    const weekDay = new Date(current);
+    weekDay.setDate(current.getDate() + index);
+    return toDateKey(weekDay);
   });
 }
 
@@ -51,24 +69,96 @@ function getCalendarStatus(summary: DailySummary, todayKey: string): CalendarDay
   return "complete";
 }
 
-export function useTimeTracker() {
-  const [entries, setEntries] = useState<TimeEntry[]>(demoEntries);
-  const [breaks, setBreaks] = useState<BreakEntry[]>(demoBreaks);
-  const [movements] = useState<HourBankMovement[]>(demoHourBankMovements);
-  const todayKey = toDateKey(demoToday);
+function inferNextAction(entries: TimeEntry[], breaks: BreakEntry[]) {
+  const baseStatus = summarizeDay({
+    date: toDateKey(new Date()),
+    entries,
+    breaks,
+    now: new Date(),
+  }).status;
+
+  if (baseStatus === "closed") return null;
+
+  const hasArrival = entries.some((entry) => entry.type === "arrival");
+  const hasLunchStart = entries.some((entry) => entry.type === "lunch_start");
+  const hasLunchEnd = entries.some((entry) => entry.type === "lunch_end");
+  const hasOpenBreak = breaks.some((entry) => !entry.endsAt);
+
+  if (hasOpenBreak) return "break_end";
+  if (!hasArrival) return "arrival";
+  if (hasLunchStart && !hasLunchEnd) return "lunch_end";
+  if (!hasLunchStart) return "lunch_start";
+  if (hasLunchEnd) return "departure";
+
+  return getNextEntryType(baseStatus);
+}
+
+export function useTimeTracker(params: {
+  supabase: SupabaseClient | null;
+  userId: string | null;
+}) {
+  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [breaks, setBreaks] = useState<BreakEntry[]>([]);
+  const [movements, setMovements] = useState<HourBankMovement[]>([]);
+  const [state, setState] = useState<LoadingState>("idle");
+  const [error, setError] = useState<string | null>(null);
+  const today = useMemo(() => new Date(), []);
+  const todayKey = toDateKey(today);
+
+  const reload = useCallback(async () => {
+    if (!params.supabase || !params.userId) return;
+
+    setState("loading");
+    setError(null);
+
+    try {
+      const snapshot = await loadUserTimeTrackingSnapshot(
+        params.supabase,
+        params.userId,
+      );
+      setEntries(snapshot.entries);
+      setBreaks(snapshot.breaks);
+      setMovements(snapshot.movements);
+      setState("ready");
+    } catch (unknownError) {
+      const message =
+        unknownError instanceof Error
+          ? unknownError.message
+          : "Nao foi possivel carregar os registros.";
+      setError(message);
+      setState("error");
+    }
+  }, [params.supabase, params.userId]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void reload();
+    });
+  }, [reload]);
+
+  const todayEntries = useMemo(
+    () => getEntriesForDate(entries, todayKey),
+    [entries, todayKey],
+  );
+
+  const todayBreaks = useMemo(
+    () => getBreaksForDate(breaks, todayKey),
+    [breaks, todayKey],
+  );
 
   const todaySummary = useMemo(
     () =>
       summarizeDay({
         date: todayKey,
-        entries: getEntriesForDate(entries, todayKey),
-        breaks: getBreaksForDate(breaks, todayKey),
-        now: demoToday,
+        entries: todayEntries,
+        breaks: todayBreaks,
+        now: today,
       }),
-    [breaks, entries, todayKey],
+    [today, todayBreaks, todayEntries, todayKey],
   );
 
-  const monthDays = useMemo(() => getMonthDays(demoToday), []);
+  const monthDays = useMemo(() => getMonthDays(today), [today]);
+  const weekDays = useMemo(() => getWeekDays(today), [today]);
 
   const dailySummaries = useMemo(
     () =>
@@ -77,23 +167,19 @@ export function useTimeTracker() {
           date,
           entries: getEntriesForDate(entries, date),
           breaks: getBreaksForDate(breaks, date),
-          now: demoToday,
+          now: today,
         }),
       ),
-    [breaks, entries, monthDays],
+    [breaks, entries, monthDays, today],
   );
 
   const weekSummary = useMemo(
     () =>
       summarizeWeek({
-        weekStartsAt: "2026-04-27",
-        days: dailySummaries.filter((summary) =>
-          ["2026-04-27", "2026-04-28", "2026-04-29", "2026-04-30", "2026-05-01"].includes(
-            summary.date,
-          ),
-        ),
+        weekStartsAt: weekDays[0],
+        days: dailySummaries.filter((summary) => weekDays.includes(summary.date)),
       }),
-    [dailySummaries],
+    [dailySummaries, weekDays],
   );
 
   const calendarDays = useMemo(
@@ -113,39 +199,48 @@ export function useTimeTracker() {
     [movements, weekSummary.balanceMinutes],
   );
 
-  function addTimeEntry(type: TimeEntry["type"], occurredAt: string, note?: string) {
-    setEntries((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        userId,
-        type,
-        occurredAt,
-        note,
-      },
-    ]);
+  async function addTimeEntry(
+    type: TimeEntry["type"],
+    occurredAt: string,
+    note?: string,
+  ) {
+    if (!params.supabase || !params.userId) return;
+
+    setState("loading");
+    await createTimeEntry(params.supabase, {
+      userId: params.userId,
+      type,
+      occurredAt,
+      note,
+    });
+    await reload();
   }
 
-  function addBreak(category: BreakCategory, startsAt: string, note?: string) {
+  async function addBreak(
+    category: BreakCategory,
+    startsAt: string,
+    endsAt: string,
+    note?: string,
+  ) {
+    if (!params.supabase || !params.userId) return;
+
     const deductsFromWork = !["medical", "sick"].includes(category);
 
-    setBreaks((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        userId,
-        date: startsAt.slice(0, 10),
-        category,
-        startsAt,
-        endsAt: new Date(new Date(startsAt).getTime() + 30 * 60000).toISOString(),
-        deductsFromWork,
-        note,
-      },
-    ]);
+    setState("loading");
+    await createBreakEntry(params.supabase, {
+      userId: params.userId,
+      date: startsAt.slice(0, 10),
+      category,
+      startsAt,
+      endsAt,
+      deductsFromWork,
+      note,
+    });
+    await reload();
   }
 
   return {
-    today: demoToday,
+    today,
     todayKey,
     entries,
     breaks,
@@ -155,7 +250,10 @@ export function useTimeTracker() {
     dailySummaries,
     calendarDays,
     hourBankBalance,
-    nextEntryType: getNextEntryType(todaySummary.status),
+    nextEntryType: inferNextAction(todayEntries, todayBreaks),
+    state,
+    error,
+    reload,
     addTimeEntry,
     addBreak,
   };

@@ -14,7 +14,7 @@ Nana's Point e um app web mobile-first para controle pessoal de ponto, pausas e 
 ## Funcionalidades do MVP
 
 - Login com Google ou Apple via Supabase Auth quando as variaveis estiverem configuradas.
-- Modo demo navegavel quando o Supabase ainda nao estiver configurado.
+- Login obrigatorio com Supabase; sem variaveis de ambiente o app bloqueia entrada.
 - Tela "Hoje" com status do dia, horas trabalhadas, pausas e banco de horas.
 - Registro de ponto com selecao de horario e observacao opcional.
 - Registro de pausas por categoria: almoco, medico, doenca, viagem, pessoal e outro.
@@ -51,7 +51,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
-Sem essas variaveis, o app abre em modo demo. Com as variaveis configuradas, o login OAuth usa Supabase Auth.
+Sem essas variaveis, o app nao permite entrada porque o MVP usa apenas dados reais do Supabase.
 
 ## Supabase
 
@@ -88,7 +88,7 @@ npm run build
 - Horas acima da meta semanal geram credito no banco de horas.
 - Horas abaixo da meta semanal geram debito.
 - Horas trabalhadas no dia consideram chegada, saida, almoco e pausas descontaveis.
-- Pausas medicas e de doenca podem ser registradas como contexto sem desconto automatico no MVP demo.
+- Pausas medicas e de doenca podem ser registradas como contexto sem desconto automatico.
 
 ## Status
 

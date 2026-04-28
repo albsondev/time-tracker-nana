@@ -6,6 +6,7 @@ import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
+import type { Session } from "@supabase/supabase-js";
 import {
   Alert,
   AppBar,
@@ -16,6 +17,7 @@ import {
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   Container,
   Dialog,
   DialogActions,
@@ -31,9 +33,14 @@ import {
 } from "@mui/material";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { minutesToDecimalHours, minutesToHoursLabel, formatDatePtBr, formatMonthPtBr } from "@/domain/time/format";
+import {
+  formatDatePtBr,
+  formatMonthPtBr,
+  minutesToDecimalHours,
+  minutesToHoursLabel,
+} from "@/domain/time/format";
 import type { BreakCategory, TimeEntry } from "@/domain/time/types";
-import { hasSupabaseConfig, getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { fadeUp, springy, staggerContainer } from "@/shared/motion/presets";
 import { nanaColors } from "@/shared/theme/nana-theme";
 import { useTimeTracker } from "../model/use-time-tracker";
@@ -70,51 +77,56 @@ const breakLabels: Record<BreakCategory, string> = {
 const MotionCard = motion(Card);
 
 export function NanaPointApp() {
-  const tracker = useTimeTracker();
   const [tab, setTab] = useState<Tab>("today");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isDemo, setIsDemo] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(() => hasSupabaseConfig());
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
   const [breakDialogOpen, setBreakDialogOpen] = useState(false);
   const shouldReduceMotion = useReducedMotion();
+  const supabase = hasSupabaseConfig() ? getSupabaseBrowserClient() : null;
+  const tracker = useTimeTracker({
+    supabase,
+    userId: session?.user.id ?? null,
+  });
 
   const transition = shouldReduceMotion ? { duration: 0 } : springy;
 
   useEffect(() => {
-    if (!hasSupabaseConfig()) return;
+    if (!hasSupabaseConfig()) {
+      return;
+    }
 
-    const supabase = getSupabaseBrowserClient();
+    const client = getSupabaseBrowserClient();
 
-    supabase.auth.getSession().then(({ data }) => {
-      setIsAuthenticated(Boolean(data.session));
+    client.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(Boolean(session));
-      setIsDemo(false);
+    } = client.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  function enterDemo() {
-    setIsDemo(true);
-    setIsAuthenticated(true);
-  }
-
   async function logout() {
-    if (hasSupabaseConfig() && !isDemo) {
+    if (hasSupabaseConfig()) {
       await getSupabaseBrowserClient().auth.signOut();
     }
 
-    setIsDemo(false);
-    setIsAuthenticated(false);
+    setSession(null);
   }
 
-  if (!isAuthenticated) {
-    return <LoginScreen onDemo={enterDemo} />;
+  if (authLoading) {
+    return <CenteredLoading label="Carregando Nana's Point..." />;
+  }
+
+  if (!session) {
+    return <LoginScreen />;
   }
 
   return (
@@ -148,7 +160,7 @@ export function NanaPointApp() {
             {tab === "calendar" && <CalendarView tracker={tracker} />}
             {tab === "bank" && <HourBankView tracker={tracker} />}
             {tab === "history" && <HistoryView tracker={tracker} />}
-            {tab === "profile" && <ProfileView isDemo={isDemo} onLogout={logout} />}
+            {tab === "profile" && <ProfileView session={session} onLogout={logout} />}
           </motion.main>
         </AnimatePresence>
       </Container>
@@ -158,23 +170,40 @@ export function NanaPointApp() {
         open={entryDialogOpen}
         onClose={() => setEntryDialogOpen(false)}
         nextType={tracker.nextEntryType}
+        date={tracker.todayKey}
         onSubmit={tracker.addTimeEntry}
       />
       <BreakDialog
         open={breakDialogOpen}
         onClose={() => setBreakDialogOpen(false)}
+        date={tracker.todayKey}
         onSubmit={tracker.addBreak}
       />
     </Box>
   );
 }
 
-function LoginScreen({ onDemo }: { onDemo: () => void }) {
+function CenteredLoading({ label }: { label: string }) {
+  return (
+    <Box
+      sx={{
+        minHeight: "100dvh",
+        display: "grid",
+        placeItems: "center",
+        background: "linear-gradient(145deg, #fff4df 0%, #f3fbef 100%)",
+      }}
+    >
+      <Stack spacing={2} sx={{ alignItems: "center" }}>
+        <CircularProgress color="secondary" />
+        <Typography color="text.secondary">{label}</Typography>
+      </Stack>
+    </Box>
+  );
+}
+
+function LoginScreen() {
   async function login(provider: "google" | "apple") {
-    if (!hasSupabaseConfig()) {
-      onDemo();
-      return;
-    }
+    if (!hasSupabaseConfig()) return;
 
     await getSupabaseBrowserClient().auth.signInWithOAuth({
       provider,
@@ -202,30 +231,36 @@ function LoginScreen({ onDemo }: { onDemo: () => void }) {
         <CardContent sx={{ p: 4 }}>
           <Stack spacing={3}>
             <Box>
-              <Chip label="MVP mobile-first" color="secondary" />
+              <Chip label="Dados reais via Supabase" color="secondary" />
               <Typography variant="h3" sx={{ mt: 2 }}>
-                Nana’s Point
+                Nana&apos;s Point
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 1 }}>
-                Seu controle de ponto leve, fofo e confiável para acompanhar pausas,
-                jornada semanal e banco de horas.
+                Entre para registrar seus pontos, pausas e banco de horas direto no
+                Supabase.
               </Typography>
             </Box>
             <Stack spacing={1.5}>
-              <Button size="large" variant="contained" onClick={() => login("google")}>
+              <Button
+                size="large"
+                variant="contained"
+                disabled={!hasSupabaseConfig()}
+                onClick={() => login("google")}
+              >
                 Entrar com Google
               </Button>
-              <Button size="large" variant="outlined" onClick={() => login("apple")}>
+              <Button
+                size="large"
+                variant="outlined"
+                disabled={!hasSupabaseConfig()}
+                onClick={() => login("apple")}
+              >
                 Entrar com Apple
-              </Button>
-              <Button size="large" color="secondary" onClick={onDemo}>
-                Ver modo demo
               </Button>
             </Stack>
             {!hasSupabaseConfig() && (
-              <Alert severity="info">
-                Configure o Supabase no `.env.local` para login real. Enquanto isso,
-                o modo demo mantém o app navegável.
+              <Alert severity="warning">
+                Configure o `.env.local` para usar autenticação e dados reais.
               </Alert>
             )}
           </Stack>
@@ -240,7 +275,7 @@ function AppHeader({ bankBalance }: { bankBalance: number }) {
     <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 2 }}>
       <Box>
         <Typography variant="overline" color="text.secondary">
-          Nana’s Point
+          Nana&apos;s Point
         </Typography>
         <Typography variant="h5">Olá, Nana</Typography>
       </Box>
@@ -291,22 +326,24 @@ function TodayView({
               <Typography color="text.secondary">
                 {minutesToHoursLabel(summary.breakMinutes)} em pausas registradas hoje.
               </Typography>
+              {tracker.error && <Alert severity="error">{tracker.error}</Alert>}
               <Stack direction="row" spacing={1}>
                 <Button
                   fullWidth
                   size="large"
                   variant="contained"
-                  disabled={!tracker.nextEntryType}
+                  disabled={!tracker.nextEntryType || tracker.state === "loading"}
                   onClick={onOpenEntry}
                   component={motion.button}
                   whileTap={{ scale: 0.97 }}
                 >
-                  {buttonLabel}
+                  {tracker.state === "loading" ? "Salvando..." : buttonLabel}
                 </Button>
                 <Button
                   size="large"
                   color="secondary"
                   variant="outlined"
+                  disabled={tracker.state === "loading"}
                   onClick={onOpenBreak}
                   component={motion.button}
                   whileTap={{ scale: 0.97 }}
@@ -441,6 +478,9 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
         </CardContent>
       </Card>
       <Stack spacing={1.5}>
+        {tracker.movements.length === 0 && (
+          <Alert severity="info">Nenhum movimento de banco de horas salvo ainda.</Alert>
+        )}
         {tracker.movements.map((movement) => (
           <Card key={movement.id}>
             <CardContent>
@@ -469,6 +509,7 @@ function HistoryView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }
     (total, day) => total + day.workedMinutes,
     0,
   );
+  const registeredDays = tracker.dailySummaries.filter((day) => day.entries.length > 0);
 
   return (
     <Stack spacing={2}>
@@ -480,26 +521,33 @@ function HistoryView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }
           ["Pausas", String(tracker.breaks.length), "Registradas"],
         ]}
       />
-      {tracker.dailySummaries
-        .filter((day) => day.entries.length > 0)
-        .map((day) => (
-          <Card key={day.date}>
-            <CardContent>
-              <Stack direction="row" sx={{ justifyContent: "space-between" }}>
-                <Box>
-                  <Typography sx={{ fontWeight: 800 }}>{formatDatePtBr(day.date)}</Typography>
-                  <Typography color="text.secondary">{statusLabels[day.status]}</Typography>
-                </Box>
-                <Chip label={minutesToHoursLabel(day.workedMinutes)} color="secondary" />
-              </Stack>
-            </CardContent>
-          </Card>
-        ))}
+      {registeredDays.length === 0 && (
+        <Alert severity="info">Nenhum registro salvo neste mês ainda.</Alert>
+      )}
+      {registeredDays.map((day) => (
+        <Card key={day.date}>
+          <CardContent>
+            <Stack direction="row" sx={{ justifyContent: "space-between" }}>
+              <Box>
+                <Typography sx={{ fontWeight: 800 }}>{formatDatePtBr(day.date)}</Typography>
+                <Typography color="text.secondary">{statusLabels[day.status]}</Typography>
+              </Box>
+              <Chip label={minutesToHoursLabel(day.workedMinutes)} color="secondary" />
+            </Stack>
+          </CardContent>
+        </Card>
+      ))}
     </Stack>
   );
 }
 
-function ProfileView({ isDemo, onLogout }: { isDemo: boolean; onLogout: () => void }) {
+function ProfileView({
+  session,
+  onLogout,
+}: {
+  session: Session | null;
+  onLogout: () => void;
+}) {
   return (
     <Stack spacing={2}>
       <SectionTitle title="Perfil e ajustes" subtitle="Preferências do MVP" />
@@ -510,12 +558,11 @@ function ProfileView({ isDemo, onLogout }: { isDemo: boolean; onLogout: () => vo
               Meta semanal fixa: <strong>30 horas</strong>.
             </Typography>
             <Typography color="text.secondary">
-              {isDemo
-                ? "Você está navegando com dados demo. Configure o Supabase para login real e persistência."
-                : "Sessão Supabase ativa. As tabelas e políticas RLS ficam definidas nas migrations do projeto."}
+              Sessão Supabase ativa para {session?.user.email ?? "usuário autenticado"}.
+              Os dados exibidos vêm das tabelas reais protegidas por RLS.
             </Typography>
             <Button variant="outlined" color="secondary" onClick={onLogout}>
-              Sair do modo demo
+              Sair
             </Button>
           </Stack>
         </CardContent>
@@ -572,22 +619,26 @@ function BottomAppNavigation({
 function EntryDialog({
   open,
   nextType,
+  date,
   onClose,
   onSubmit,
 }: {
   open: boolean;
   nextType: TimeEntry["type"] | "pause" | null;
+  date: string;
   onClose: () => void;
-  onSubmit: (type: TimeEntry["type"], occurredAt: string, note?: string) => void;
+  onSubmit: (type: TimeEntry["type"], occurredAt: string, note?: string) => Promise<void>;
 }) {
   const [time, setTime] = useState(() => new Date().toTimeString().slice(0, 5));
   const [note, setNote] = useState("");
 
   function submit() {
     if (!nextType || nextType === "pause") return;
-    const date = "2026-04-28";
-    onSubmit(nextType, `${date}T${time}:00-03:00`, note || undefined);
-    onClose();
+    void onSubmit(
+      nextType,
+      new Date(`${date}T${time}:00`).toISOString(),
+      note || undefined,
+    ).then(onClose);
   }
 
   return (
@@ -622,20 +673,32 @@ function EntryDialog({
 
 function BreakDialog({
   open,
+  date,
   onClose,
   onSubmit,
 }: {
   open: boolean;
+  date: string;
   onClose: () => void;
-  onSubmit: (category: BreakCategory, startsAt: string, note?: string) => void;
+  onSubmit: (
+    category: BreakCategory,
+    startsAt: string,
+    endsAt: string,
+    note?: string,
+  ) => Promise<void>;
 }) {
   const [category, setCategory] = useState<BreakCategory>("personal");
   const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
+  const [endTime, setEndTime] = useState(new Date().toTimeString().slice(0, 5));
   const [note, setNote] = useState("");
 
   function submit() {
-    onSubmit(category, `2026-04-28T${time}:00-03:00`, note || undefined);
-    onClose();
+    void onSubmit(
+      category,
+      new Date(`${date}T${time}:00`).toISOString(),
+      new Date(`${date}T${endTime}:00`).toISOString(),
+      note || undefined,
+    ).then(onClose);
   }
 
   return (
@@ -657,8 +720,23 @@ function BreakDialog({
               ))}
             </Select>
           </FormControl>
-          <TextField label="Horário inicial" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
-          <TextField label="Observação opcional" value={note} onChange={(event) => setNote(event.target.value)} />
+          <TextField
+            label="Horário inicial"
+            type="time"
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+          />
+          <TextField
+            label="Horário final"
+            type="time"
+            value={endTime}
+            onChange={(event) => setEndTime(event.target.value)}
+          />
+          <TextField
+            label="Observação opcional"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
         </Stack>
       </DialogContent>
       <DialogActions>

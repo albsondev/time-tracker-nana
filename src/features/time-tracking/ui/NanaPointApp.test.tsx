@@ -1,6 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppProviders } from "@/app/providers";
 import { NanaPointApp } from "./NanaPointApp";
 
@@ -13,23 +12,19 @@ function renderApp() {
 }
 
 describe("NanaPointApp", () => {
-  it("allows entering demo mode and viewing the today dashboard", async () => {
-    renderApp();
-
-    await userEvent.click(screen.getByRole("button", { name: /ver modo demo/i }));
-
-    expect(screen.getByText("Olá, Nana")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sair para almoço/i })).toBeInTheDocument();
-    expect(screen.getByText("Saldo semanal")).toBeInTheDocument();
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
-  it("navigates to the calendar through the bottom menu", async () => {
+  it("shows the real Supabase login screen without local bypass access", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "");
+
     renderApp();
 
-    await userEvent.click(screen.getByRole("button", { name: /ver modo demo/i }));
-    await userEvent.click(screen.getByRole("button", { name: /calendário/i }));
-
-    expect(await screen.findByRole("heading", { name: "Calendário" })).toBeInTheDocument();
-    expect(await screen.findByText("abril de 2026")).toBeInTheDocument();
+    expect(await screen.findByText("Nana's Point")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /entrar com google/i })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /modo/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/configure o `.env.local`/i)).toBeInTheDocument();
   });
 });
