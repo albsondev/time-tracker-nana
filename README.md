@@ -1,6 +1,6 @@
 # Nana's Point
 
-Nana's Point e um app web mobile-first para controle pessoal de ponto, pausas e banco de horas. O MVP foi pensado para uso rapido no iPhone, com visual leve inspirado em Material Design, cores laranja e verde, Supabase para autenticacao/dados e Framer Motion para microinteracoes.
+Nana's Point e um app web mobile-first para controle pessoal de ponto, pausas e banco de horas. O produto foi pensado para uso rapido no iPhone, com visual leve inspirado em Material Design, cores laranja e verde, Supabase para autenticacao/dados e Framer Motion para microinteracoes.
 
 ## Stack
 
@@ -11,25 +11,31 @@ Nana's Point e um app web mobile-first para controle pessoal de ponto, pausas e 
 - Supabase Auth + Postgres
 - Vitest + Testing Library
 
-## Funcionalidades do MVP
+## Funcionalidades
 
-- Login e cadastro com e-mail/senha via Supabase Auth quando as variaveis estiverem configuradas.
+- Login e cadastro com e-mail/senha via Supabase Auth.
 - Login obrigatorio com Supabase; sem variaveis de ambiente o app bloqueia entrada.
 - Tela "Hoje" com status do dia, horas trabalhadas, pausas e banco de horas.
 - Registro de ponto com selecao de horario e observacao opcional.
 - Registro de pausas por categoria: almoco, medico, doenca, viagem, pessoal e outro.
 - Calendario mensal com marcadores visuais de status.
-- Banco de horas com creditos, debitos e saldo acumulado.
+- Banco de horas baseado apenas em movimentos salvos no Supabase.
 - Historico mensal com dias registrados.
 - Bottom navigation otimizada para celular.
 - Animacoes de entrada, transicao de telas, botoes e feedbacks com Framer Motion.
+
+## Garantia de dados
+
+A interface nao usa dados demonstrativos, informacoes ficticias, atalhos locais ou registros mockados. Quando ainda nao existem registros no Supabase, a tela exibe estados vazios como "Sem registros", "Sem saldo" ou "Nenhum movimento lançado ainda".
+
+O banco de horas exibido ao usuario e calculado somente a partir da tabela `hour_bank_movements`. A semana atual pode mostrar horas registradas, mas nao cria debito automatico quando nao ha fechamento salvo.
 
 ## Arquitetura
 
 O codigo separa dominio, dados e interface:
 
 - `src/domain/time`: regras puras de calculo de jornada, pausas, resumo semanal e banco de horas.
-- `src/features/time-tracking`: estado do MVP, telas e componentes do produto.
+- `src/features/time-tracking`: estado das telas, fluxo de ponto e componentes do produto.
 - `src/lib/supabase`: cliente Supabase lazy e contratos de banco.
 - `src/shared`: tema Material UI e presets de motion.
 - `supabase/migrations`: schema inicial e politicas RLS.
@@ -51,7 +57,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
-Sem essas variaveis, o app nao permite entrada porque o MVP usa apenas dados reais do Supabase.
+Sem essas variaveis, o app nao permite entrada porque o produto usa apenas dados reais do Supabase.
 
 ## Supabase
 
@@ -71,7 +77,7 @@ supabase link --project-ref <project-ref>
 supabase db push
 ```
 
-Tambem sera necessario manter o provedor de e-mail habilitado no painel do Supabase Auth.
+Tambem sera necessario manter o provedor de e-mail habilitado no painel do Supabase Auth. Se quiser cadastro sem confirmacao por e-mail, desative a confirmacao em Authentication > Providers > Email no painel do Supabase.
 
 ## Scripts
 
@@ -84,18 +90,18 @@ npm run build
 
 ## Regras de negocio
 
-- Meta semanal padrao: 30 horas.
-- Horas acima da meta semanal geram credito no banco de horas.
-- Horas abaixo da meta semanal geram debito.
+- Jornada semanal de referencia: 30 horas.
+- Horas acima da referencia semanal podem gerar credito quando houver movimento salvo.
+- Horas abaixo da referencia semanal podem gerar debito quando houver movimento salvo.
 - Horas trabalhadas no dia consideram chegada, saida, almoco e pausas descontaveis.
 - Pausas medicas e de doenca podem ser registradas como contexto sem desconto automatico.
 
 ## Status
 
-Este MVP entrega a base visual, dominio testado, migrations Supabase e fluxos principais navegaveis. Proximas evolucoes naturais:
+O produto possui base visual, dominio testado, migrations Supabase e fluxos principais conectados ao Supabase. Proximas evolucoes naturais:
 
-- Persistir todos os registros criados pela UI diretamente no Supabase.
 - Editar registros antigos.
+- Criar fechamento semanal para lançar credito/debito no banco de horas.
 - Notificacoes de lembrete.
 - Feriados e jornadas configuraveis.
 - Relatorios/exportacao mensal.

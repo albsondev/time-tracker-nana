@@ -164,7 +164,11 @@ export function NanaPointApp() {
       }}
     >
       <Container maxWidth="sm" sx={{ px: 2, py: 2.5 }}>
-        <AppHeader bankBalance={tracker.hourBankBalance} displayName={displayName} />
+        <AppHeader
+          bankBalance={tracker.hourBankBalance}
+          displayName={displayName}
+          hasHourBankMovements={tracker.hasHourBankMovements}
+        />
 
         <AnimatePresence mode="wait">
           <motion.main
@@ -395,9 +399,11 @@ function AuthScreen() {
 function AppHeader({
   bankBalance,
   displayName,
+  hasHourBankMovements,
 }: {
   bankBalance: number;
   displayName: string;
+  hasHourBankMovements: boolean;
 }) {
   return (
     <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 2 }}>
@@ -409,7 +415,7 @@ function AppHeader({
       </Box>
       <Chip
         icon={<SavingsRoundedIcon />}
-        label={minutesToHoursLabel(bankBalance)}
+        label={hasHourBankMovements ? minutesToHoursLabel(bankBalance) : "Sem saldo"}
         color={bankBalance >= 0 ? "secondary" : "warning"}
       />
     </Stack>
@@ -432,6 +438,19 @@ function TodayView({
     tracker.nextEntryType && tracker.nextEntryType !== "pause"
       ? actionLabels[tracker.nextEntryType]
       : "Dia registrado";
+  const weekDeltaLabel =
+    tracker.hasWeekEntries && tracker.weekReferenceDelta > 0
+      ? minutesToHoursLabel(tracker.weekReferenceDelta)
+      : tracker.hasWeekEntries
+        ? "Em aberto"
+        : "Sem registros";
+  const weekDeltaCaption =
+    tracker.hasWeekEntries && tracker.weekReferenceDelta > 0
+      ? "Acima da jornada"
+      : "Semana não fechada";
+  const bankLabel = tracker.hasHourBankMovements
+    ? minutesToHoursLabel(tracker.hourBankBalance)
+    : "Sem saldo";
 
   return (
     <motion.section variants={staggerContainer} initial="hidden" animate="visible">
@@ -452,7 +471,9 @@ function TodayView({
                 {minutesToDecimalHours(summary.workedMinutes)}h
               </Typography>
               <Typography color="text.secondary">
-                {minutesToHoursLabel(summary.breakMinutes)} em pausas registradas hoje.
+                {tracker.hasTodayEntries
+                  ? `${minutesToHoursLabel(summary.breakMinutes)} em pausas registradas hoje.`
+                  : "Nenhum ponto registrado hoje ainda."}
               </Typography>
               {tracker.error && <Alert severity="error">{tracker.error}</Alert>}
               <Stack direction="row" spacing={1}>
@@ -485,9 +506,15 @@ function TodayView({
 
         <SummaryGrid
           items={[
-            ["Semana", minutesToHoursLabel(tracker.weekSummary.workedMinutes), "Meta: 30h"],
-            ["Saldo semanal", minutesToHoursLabel(tracker.weekSummary.balanceMinutes), "Crédito/débito"],
-            ["Banco", minutesToHoursLabel(tracker.hourBankBalance), "Saldo acumulado"],
+            [
+              "Semana",
+              tracker.hasWeekEntries
+                ? minutesToHoursLabel(tracker.weekWorkedMinutes)
+                : "Sem registros",
+              "Horas registradas",
+            ],
+            ["Saldo semanal", weekDeltaLabel, weekDeltaCaption],
+            ["Banco", bankLabel, "Movimentos lançados"],
           ]}
         />
       </Stack>
@@ -587,7 +614,8 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
   return (
     <Stack spacing={2}>
       <SectionTitle title="Banco de horas" subtitle="Créditos, débitos e compensações" />
-      <Card>
+      {tracker.hasHourBankMovements ? (
+        <Card>
         <CardContent sx={{ p: 3 }}>
           <Typography color="text.secondary">Saldo atual</Typography>
           <Typography
@@ -601,14 +629,16 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
             {minutesToHoursLabel(tracker.hourBankBalance)}
           </Typography>
           <Typography color="text.secondary">
-            Inclui os movimentos salvos e a diferença da semana atual.
+            Calculado somente a partir dos movimentos salvos no banco.
           </Typography>
         </CardContent>
-      </Card>
+        </Card>
+      ) : (
+        <Alert severity="info">
+          Nenhum movimento de banco de horas foi lançado ainda.
+        </Alert>
+      )}
       <Stack spacing={1.5}>
-        {tracker.movements.length === 0 && (
-          <Alert severity="info">Nenhum movimento de banco de horas salvo ainda.</Alert>
-        )}
         {tracker.movements.map((movement) => (
           <Card key={movement.id}>
             <CardContent>
@@ -638,15 +668,27 @@ function HistoryView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }
     0,
   );
   const registeredDays = tracker.dailySummaries.filter((day) => day.entries.length > 0);
+  const monthLabel = registeredDays.length > 0
+    ? minutesToHoursLabel(workedThisMonth)
+    : "Sem registros";
+  const pausesLabel = tracker.breaks.length > 0
+    ? String(tracker.breaks.length)
+    : "Sem pausas";
 
   return (
     <Stack spacing={2}>
       <SectionTitle title="Histórico" subtitle="Resumo mensal e rastreabilidade" />
       <SummaryGrid
         items={[
-          ["Mês", minutesToHoursLabel(workedThisMonth), "Horas trabalhadas"],
-          ["Semana", minutesToHoursLabel(tracker.weekSummary.balanceMinutes), "Saldo atual"],
-          ["Pausas", String(tracker.breaks.length), "Registradas"],
+          ["Mês", monthLabel, "Horas registradas"],
+          [
+            "Semana",
+            tracker.hasWeekEntries
+              ? minutesToHoursLabel(tracker.weekWorkedMinutes)
+              : "Sem registros",
+            "Horas registradas",
+          ],
+          ["Pausas", pausesLabel, "Registradas"],
         ]}
       />
       {registeredDays.length === 0 && (
@@ -685,7 +727,7 @@ function ProfileView({
         <CardContent sx={{ p: 3 }}>
           <Stack spacing={2}>
             <Typography>
-              Meta semanal fixa: <strong>30 horas</strong>.
+              Jornada de referência: <strong>30 horas semanais</strong>.
             </Typography>
             <Typography>
               Nome: <strong>{displayName}</strong>

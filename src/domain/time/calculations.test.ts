@@ -94,10 +94,10 @@ describe("time calculations", () => {
     expect(
       calculateHourBankBalance([
         { minutesDelta: 120 },
-        { minutesDelta: -30 },
+        { minutesDelta: -45 },
         { minutesDelta: 45 },
       ]),
-    ).toBe(135);
+    ).toBe(120);
   });
 
   it("returns the next contextual action from the day status", () => {

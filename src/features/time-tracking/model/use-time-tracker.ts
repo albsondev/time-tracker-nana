@@ -6,7 +6,7 @@ import {
   calculateHourBankBalance,
   getNextEntryType,
   summarizeDay,
-  summarizeWeek,
+  WEEKLY_EXPECTED_MINUTES,
 } from "@/domain/time/calculations";
 import { toDateKey } from "@/domain/time/format";
 import type {
@@ -173,14 +173,21 @@ export function useTimeTracker(params: {
     [breaks, entries, monthDays, today],
   );
 
-  const weekSummary = useMemo(
-    () =>
-      summarizeWeek({
-        weekStartsAt: weekDays[0],
-        days: dailySummaries.filter((summary) => weekDays.includes(summary.date)),
-      }),
+  const weekDailySummaries = useMemo(
+    () => dailySummaries.filter((summary) => weekDays.includes(summary.date)),
     [dailySummaries, weekDays],
   );
+
+  const hasTodayEntries = todayEntries.length > 0;
+  const hasWeekEntries = weekDailySummaries.some((summary) => summary.entries.length > 0);
+  const hasHourBankMovements = movements.length > 0;
+
+  const weekWorkedMinutes = useMemo(
+    () => weekDailySummaries.reduce((total, day) => total + day.workedMinutes, 0),
+    [weekDailySummaries],
+  );
+
+  const weekReferenceDelta = weekWorkedMinutes - WEEKLY_EXPECTED_MINUTES;
 
   const calendarDays = useMemo(
     () =>
@@ -195,8 +202,8 @@ export function useTimeTracker(params: {
   );
 
   const hourBankBalance = useMemo(
-    () => calculateHourBankBalance(movements) + weekSummary.balanceMinutes,
-    [movements, weekSummary.balanceMinutes],
+    () => calculateHourBankBalance(movements),
+    [movements],
   );
 
   async function addTimeEntry(
@@ -246,7 +253,11 @@ export function useTimeTracker(params: {
     breaks,
     movements,
     todaySummary,
-    weekSummary,
+    hasTodayEntries,
+    hasWeekEntries,
+    hasHourBankMovements,
+    weekWorkedMinutes,
+    weekReferenceDelta,
     dailySummaries,
     calendarDays,
     hourBankBalance,
