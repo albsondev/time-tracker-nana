@@ -2,6 +2,7 @@
 
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
@@ -23,23 +24,30 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
+  Popover,
   Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import type { MouseEvent } from "react";
 import { useEffect, useState } from "react";
 import {
   formatDatePtBr,
   formatMonthPtBr,
+  formatTimePtBr,
+  formatWeekdayLongPtBr,
+  formatWeekdayShortPtBr,
   minutesToDecimalHours,
   minutesToHoursLabel,
 } from "@/domain/time/format";
-import type { BreakCategory, TimeEntry } from "@/domain/time/types";
+import type { BreakCategory, BreakEntry, TimeEntry } from "@/domain/time/types";
 import { getSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { fadeUp, springy, staggerContainer } from "@/shared/motion/presets";
 import { nanaColors } from "@/shared/theme/nana-theme";
@@ -47,6 +55,10 @@ import { upsertUserProfile } from "../data/time-tracking-repository";
 import { useTimeTracker } from "../model/use-time-tracker";
 
 type Tab = "today" | "calendar" | "bank" | "history" | "profile";
+
+type EditTarget =
+  | { kind: "time"; entry: TimeEntry }
+  | { kind: "break"; entry: BreakEntry };
 
 const actionLabels: Record<TimeEntry["type"], string> = {
   arrival: "Cheguei no trabalho",
@@ -92,12 +104,28 @@ function getFirstName(name: string) {
   return name.trim().split(/\s+/)[0] || name;
 }
 
+function toDateInputValue(isoDate: string) {
+  return isoDate.slice(0, 10);
+}
+
+function toTimeInputValue(isoDate: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(isoDate));
+}
+
+function toEditableIso(date: string, time: string) {
+  return new Date(`${date}T${time}:00`).toISOString();
+}
+
 export function NanaPointApp() {
   const [tab, setTab] = useState<Tab>("today");
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(() => hasSupabaseConfig());
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
   const [breakDialogOpen, setBreakDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const shouldReduceMotion = useReducedMotion();
   const supabase = hasSupabaseConfig() ? getSupabaseBrowserClient() : null;
   const tracker = useTimeTracker({
@@ -186,9 +214,13 @@ export function NanaPointApp() {
                 transition={transition}
               />
             )}
-            {tab === "calendar" && <CalendarView tracker={tracker} />}
+            {tab === "calendar" && (
+              <CalendarView tracker={tracker} onEdit={setEditTarget} />
+            )}
             {tab === "bank" && <HourBankView tracker={tracker} />}
-            {tab === "history" && <HistoryView tracker={tracker} />}
+            {tab === "history" && (
+              <HistoryView tracker={tracker} onEdit={setEditTarget} />
+            )}
             {tab === "profile" && (
               <ProfileView
                 displayName={displayName}
@@ -213,6 +245,12 @@ export function NanaPointApp() {
         onClose={() => setBreakDialogOpen(false)}
         date={tracker.todayKey}
         onSubmit={tracker.addBreak}
+      />
+      <EditRecordDialog
+        target={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSubmitTime={tracker.editTimeEntry}
+        onSubmitBreak={tracker.editBreak}
       />
     </Box>
   );
@@ -551,7 +589,15 @@ function SummaryGrid({ items }: { items: [string, string, string][] }) {
   );
 }
 
-function CalendarView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }) {
+function CalendarView({
+  tracker,
+  onEdit,
+}: {
+  tracker: ReturnType<typeof useTimeTracker>;
+  onEdit: (target: EditTarget) => void;
+}) {
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const colors = {
     today: nanaColors.orange,
     complete: nanaColors.green,
@@ -560,6 +606,19 @@ function CalendarView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
     pending: "#ef6c00",
     empty: "#d8d1c6",
   };
+  const selectedDay =
+    tracker.calendarDays.find((day) => day.date === selectedDate) ?? null;
+  const popoverOpen = Boolean(anchorEl && selectedDay);
+
+  function openDay(event: MouseEvent<HTMLElement>, date: string) {
+    setAnchorEl(event.currentTarget);
+    setSelectedDate(date);
+  }
+
+  function closeDay() {
+    setAnchorEl(null);
+    setSelectedDate(null);
+  }
 
   return (
     <Stack spacing={2}>
@@ -569,24 +628,41 @@ function CalendarView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1 }}>
             {tracker.calendarDays.map((day, index) => (
               <Box
-                component={motion.div}
+                component={motion.button}
+                type="button"
                 key={day.date}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.012 }}
+                onClick={(event) => openDay(event, day.date)}
                 sx={{
                   aspectRatio: "1",
-                  borderRadius: 3,
-                  display: "grid",
-                  placeItems: "center",
+                  borderRadius: 2,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 0.3,
                   bgcolor: day.status === "empty" ? "#fffaf3" : "#ffffff",
                   border: `2px solid ${colors[day.status]}`,
                   color: day.status === "empty" ? "text.secondary" : "text.primary",
                   position: "relative",
                   fontWeight: 800,
+                  cursor: "pointer",
+                  font: "inherit",
+                  p: 0.5,
+                  "&:hover": {
+                    boxShadow: "0 10px 22px rgba(64, 42, 12, 0.12)",
+                    transform: "translateY(-1px)",
+                  },
                 }}
               >
-                {day.day}
+                <Typography variant="caption" sx={{ fontWeight: 900, lineHeight: 1 }}>
+                  {formatWeekdayShortPtBr(day.date)}
+                </Typography>
+                <Typography sx={{ fontWeight: 900, lineHeight: 1 }}>
+                  {day.day}
+                </Typography>
                 <Box
                   sx={{
                     width: 7,
@@ -602,7 +678,86 @@ function CalendarView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
           </Box>
         </CardContent>
       </Card>
+      <Popover
+        open={popoverOpen}
+        anchorEl={anchorEl}
+        onClose={closeDay}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        transformOrigin={{ vertical: "top", horizontal: "center" }}
+        slotProps={{
+          paper: {
+            sx: {
+              width: 320,
+              maxWidth: "calc(100vw - 32px)",
+              borderRadius: 3,
+              border: `1px solid ${nanaColors.line}`,
+            },
+          },
+        }}
+      >
+        {selectedDay && (
+          <DayPopoverContent
+            day={selectedDay}
+            onEdit={onEdit}
+            onAfterEdit={closeDay}
+          />
+        )}
+      </Popover>
       <Legend />
+    </Stack>
+  );
+}
+
+function DayPopoverContent({
+  day,
+  onEdit,
+  onAfterEdit,
+}: {
+  day: ReturnType<typeof useTimeTracker>["calendarDays"][number];
+  onEdit: (target: EditTarget) => void;
+  onAfterEdit: () => void;
+}) {
+  const hasRecords = day.entries.length > 0 || day.breaks.length > 0;
+
+  function edit(target: EditTarget) {
+    onEdit(target);
+    onAfterEdit();
+  }
+
+  return (
+    <Stack spacing={1.5} sx={{ p: 2 }}>
+      <Box>
+        <Typography variant="overline" color="text.secondary">
+          {formatWeekdayLongPtBr(day.date)}
+        </Typography>
+        <Typography variant="h6">{formatDatePtBr(day.date)}</Typography>
+      </Box>
+      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
+        <Chip label={statusLabels[day.dayStatus]} size="small" />
+        <Chip
+          label={minutesToHoursLabel(day.workedMinutes)}
+          size="small"
+          color="secondary"
+        />
+        {day.balanceMinutes !== 0 && (
+          <Chip
+            label={minutesToHoursLabel(day.balanceMinutes)}
+            size="small"
+            color={day.balanceMinutes > 0 ? "secondary" : "warning"}
+          />
+        )}
+      </Stack>
+      <Divider />
+      {!hasRecords && (
+        <Typography color="text.secondary">
+          Nenhum registro salvo nesta data.
+        </Typography>
+      )}
+      <RecordMiniList
+        entries={day.entries}
+        breaks={day.breaks}
+        onEdit={edit}
+      />
     </Stack>
   );
 }
@@ -615,6 +770,81 @@ function Legend() {
       <Chip label="Excedeu" color="secondary" />
       <Chip label="Atenção" color="warning" />
       <Chip label="Sem registro" />
+    </Stack>
+  );
+}
+
+function RecordMiniList({
+  entries,
+  breaks,
+  onEdit,
+}: {
+  entries: TimeEntry[];
+  breaks: BreakEntry[];
+  onEdit: (target: EditTarget) => void;
+}) {
+  const records = [
+    ...entries.map((entry) => ({
+      id: `time-${entry.id}`,
+      at: entry.occurredAt,
+      label: actionLabels[entry.type],
+      caption: entry.note,
+      isModified: entry.isModified,
+      onEdit: () => onEdit({ kind: "time", entry }),
+    })),
+    ...breaks.map((entry) => ({
+      id: `break-${entry.id}`,
+      at: entry.startsAt,
+      label: `${breakLabels[entry.category]} ${formatTimePtBr(entry.startsAt)}-${entry.endsAt ? formatTimePtBr(entry.endsAt) : "aberta"}`,
+      caption: entry.note,
+      isModified: entry.isModified,
+      onEdit: () => onEdit({ kind: "break", entry }),
+    })),
+  ].sort((first, second) => first.at.localeCompare(second.at));
+
+  if (records.length === 0) return null;
+
+  return (
+    <Stack spacing={1}>
+      {records.map((record) => (
+        <Stack
+          key={record.id}
+          direction="row"
+          sx={{
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            py: 0.5,
+          }}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+              <Typography sx={{ fontWeight: 800 }}>
+                {formatTimePtBr(record.at)}
+              </Typography>
+              {record.isModified && (
+                <Chip label="editado" color="warning" size="small" />
+              )}
+            </Stack>
+            <Typography variant="body2" color="text.secondary">
+              {record.label}
+            </Typography>
+            {record.caption && (
+              <Typography variant="caption" color="text.secondary">
+                {record.caption}
+              </Typography>
+            )}
+          </Box>
+          <IconButton
+            aria-label="Editar registro"
+            color="primary"
+            size="small"
+            onClick={record.onEdit}
+          >
+            <EditRoundedIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      ))}
     </Stack>
   );
 }
@@ -671,7 +901,13 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
   );
 }
 
-function HistoryView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }) {
+function HistoryView({
+  tracker,
+  onEdit,
+}: {
+  tracker: ReturnType<typeof useTimeTracker>;
+  onEdit: (target: EditTarget) => void;
+}) {
   const workedThisMonth = tracker.dailySummaries.reduce(
     (total, day) => total + day.workedMinutes,
     0,
@@ -706,13 +942,21 @@ function HistoryView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }
       {registeredDays.map((day) => (
         <Card key={day.date}>
           <CardContent>
-            <Stack direction="row" sx={{ justifyContent: "space-between" }}>
+            <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
               <Box>
                 <Typography sx={{ fontWeight: 800 }}>{formatDatePtBr(day.date)}</Typography>
-                <Typography color="text.secondary">{statusLabels[day.status]}</Typography>
+                <Typography color="text.secondary">
+                  {formatWeekdayLongPtBr(day.date)} · {statusLabels[day.status]}
+                </Typography>
               </Box>
               <Chip label={minutesToHoursLabel(day.workedMinutes)} color="secondary" />
             </Stack>
+            <Divider sx={{ my: 1.5 }} />
+            <RecordMiniList
+              entries={day.entries}
+              breaks={day.breaks}
+              onEdit={onEdit}
+            />
           </CardContent>
         </Card>
       ))}
@@ -811,6 +1055,198 @@ function BottomAppNavigation({
         <BottomNavigationAction label="Perfil" value="profile" icon={<PersonRoundedIcon />} />
       </BottomNavigation>
     </AppBar>
+  );
+}
+
+function EditRecordDialog({
+  target,
+  onClose,
+  onSubmitTime,
+  onSubmitBreak,
+}: {
+  target: EditTarget | null;
+  onClose: () => void;
+  onSubmitTime: (
+    entryId: string,
+    type: TimeEntry["type"],
+    occurredAt: string,
+    note?: string,
+  ) => Promise<void>;
+  onSubmitBreak: (
+    breakId: string,
+    category: BreakCategory,
+    startsAt: string,
+    endsAt: string,
+    note?: string,
+  ) => Promise<void>;
+}) {
+  const isBreak = target?.kind === "break";
+
+  return (
+    <Dialog open={Boolean(target)} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>
+        {isBreak ? "Editar pausa" : "Editar registro"}
+      </DialogTitle>
+      {target && (
+        <EditRecordFields
+          key={`${target.kind}-${target.entry.id}`}
+          target={target}
+          onClose={onClose}
+          onSubmitTime={onSubmitTime}
+          onSubmitBreak={onSubmitBreak}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+function EditRecordFields({
+  target,
+  onClose,
+  onSubmitTime,
+  onSubmitBreak,
+}: {
+  target: EditTarget;
+  onClose: () => void;
+  onSubmitTime: (
+    entryId: string,
+    type: TimeEntry["type"],
+    occurredAt: string,
+    note?: string,
+  ) => Promise<void>;
+  onSubmitBreak: (
+    breakId: string,
+    category: BreakCategory,
+    startsAt: string,
+    endsAt: string,
+    note?: string,
+  ) => Promise<void>;
+}) {
+  const isBreak = target.kind === "break";
+  const [type, setType] = useState<TimeEntry["type"]>(
+    target.kind === "time" ? target.entry.type : "arrival",
+  );
+  const [category, setCategory] = useState<BreakCategory>(
+    target.kind === "break" ? target.entry.category : "personal",
+  );
+  const [date, setDate] = useState(
+    target.kind === "time"
+      ? toDateInputValue(target.entry.occurredAt)
+      : toDateInputValue(target.entry.startsAt),
+  );
+  const [time, setTime] = useState(
+    target.kind === "time"
+      ? toTimeInputValue(target.entry.occurredAt)
+      : toTimeInputValue(target.entry.startsAt),
+  );
+  const [endTime, setEndTime] = useState(
+    target.kind === "break"
+      ? toTimeInputValue(target.entry.endsAt ?? target.entry.startsAt)
+      : "",
+  );
+  const [note, setNote] = useState(target.entry.note ?? "");
+
+  function submit() {
+    if (!date || !time) return;
+
+    if (target.kind === "time") {
+      void onSubmitTime(
+        target.entry.id,
+        type,
+        toEditableIso(date, time),
+        note || undefined,
+      ).then(onClose);
+      return;
+    }
+
+    if (!endTime) return;
+
+    void onSubmitBreak(
+      target.entry.id,
+      category,
+      toEditableIso(date, time),
+      toEditableIso(date, endTime),
+      note || undefined,
+    ).then(onClose);
+  }
+
+  return (
+    <>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {isBreak ? (
+            <FormControl fullWidth>
+              <InputLabel>Tipo de pausa</InputLabel>
+              <Select
+                label="Tipo de pausa"
+                value={category}
+                onChange={(event) => setCategory(event.target.value as BreakCategory)}
+              >
+                {Object.entries(breakLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : (
+            <FormControl fullWidth>
+              <InputLabel>Tipo de registro</InputLabel>
+              <Select
+                label="Tipo de registro"
+                value={type}
+                onChange={(event) => setType(event.target.value as TimeEntry["type"])}
+              >
+                {Object.entries(actionLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+          <TextField
+            label="Data"
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            fullWidth
+          />
+          <TextField
+            label={isBreak ? "Horário inicial" : "Horário"}
+            type="time"
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+            fullWidth
+          />
+          {isBreak && (
+            <TextField
+              label="Horário final"
+              type="time"
+              value={endTime}
+              onChange={(event) => setEndTime(event.target.value)}
+              fullWidth
+            />
+          )}
+          <TextField
+            label="Observação opcional"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            fullWidth
+          />
+          <Alert severity="info">
+            Ao salvar, o item fica marcado como editado e os totais são
+            recalculados com os novos horários.
+          </Alert>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" onClick={submit}>
+          Salvar edição
+        </Button>
+      </DialogActions>
+    </>
   );
 }
 

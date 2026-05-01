@@ -33,6 +33,29 @@ export function formatDatePtBr(dateKey: string): string {
   }).format(new Date(`${dateKey}T12:00:00`));
 }
 
+export function formatWeekdayLongPtBr(dateKey: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+  }).format(new Date(`${dateKey}T12:00:00`));
+}
+
+export function formatWeekdayShortPtBr(dateKey: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "short",
+  })
+    .format(new Date(`${dateKey}T12:00:00`))
+    .replace(".", "")
+    .slice(0, 3)
+    .toUpperCase();
+}
+
+export function formatTimePtBr(isoDate: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(isoDate));
+}
+
 export function formatMonthPtBr(date: Date): string {
   return new Intl.DateTimeFormat("pt-BR", {
     month: "long",
