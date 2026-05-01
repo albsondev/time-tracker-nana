@@ -53,6 +53,7 @@ import {
   formatWeekdayShortPtBr,
   minutesToDecimalHours,
   minutesToHoursLabel,
+  toDateKey,
 } from "@/domain/time/format";
 import type { BreakCategory, BreakEntry, TimeEntry } from "@/domain/time/types";
 import { getSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase/client";
@@ -112,7 +113,7 @@ function getFirstName(name: string) {
 }
 
 function toDateInputValue(isoDate: string) {
-  return isoDate.slice(0, 10);
+  return toDateKey(new Date(isoDate));
 }
 
 function toTimeInputValue(isoDate: string) {
@@ -1293,13 +1294,33 @@ function HistoryView({
     (total, day) => total + day.workedMinutes,
     0,
   );
-  const registeredDays = tracker.dailySummaries.filter((day) => day.entries.length > 0);
+  const registeredDays = tracker.historySummaries;
   const monthLabel = registeredDays.length > 0
     ? minutesToHoursLabel(workedThisMonth)
     : "Sem registros";
   const pausesLabel = tracker.breaks.length > 0
     ? String(tracker.breaks.length)
     : "Sem pausas";
+  const historyGroups = registeredDays.reduce<
+    { monthKey: string; days: typeof registeredDays; workedMinutes: number }[]
+  >((groups, day) => {
+    const monthKey = day.date.slice(0, 7);
+    const currentGroup = groups.find((group) => group.monthKey === monthKey);
+
+    if (currentGroup) {
+      currentGroup.days.push(day);
+      currentGroup.workedMinutes += day.workedMinutes;
+      return groups;
+    }
+
+    groups.push({
+      monthKey,
+      days: [day],
+      workedMinutes: day.workedMinutes,
+    });
+
+    return groups;
+  }, []);
 
   return (
     <Stack spacing={2}>
@@ -1320,26 +1341,52 @@ function HistoryView({
       {registeredDays.length === 0 && (
         <Alert severity="info">Nenhum registro salvo neste mês ainda.</Alert>
       )}
-      {registeredDays.map((day) => (
-        <Card key={day.date}>
-          <CardContent>
-            <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
-              <Box>
-                <Typography sx={{ fontWeight: 800 }}>{formatDatePtBr(day.date)}</Typography>
-                <Typography color="text.secondary">
-                  {formatWeekdayLongPtBr(day.date)} · {statusLabels[day.status]}
-                </Typography>
-              </Box>
-              <Chip label={minutesToHoursLabel(day.workedMinutes)} color="secondary" />
-            </Stack>
-            <Divider sx={{ my: 1.5 }} />
-            <RecordMiniList
-              entries={day.entries}
-              breaks={day.breaks}
-              onEdit={onEdit}
+      {historyGroups.map((group) => (
+        <Stack key={group.monthKey} spacing={1.2}>
+          <Stack
+            direction="row"
+            sx={{
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1.5,
+            }}
+          >
+            <Box>
+              <Typography sx={{ fontWeight: 900 }}>
+                {formatMonthPtBr(new Date(`${group.monthKey}-01T12:00:00`))}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {group.days.length} dias com registros
+              </Typography>
+            </Box>
+            <Chip
+              label={minutesToHoursLabel(group.workedMinutes)}
+              color="secondary"
+              sx={{ borderRadius: "8px" }}
             />
-          </CardContent>
-        </Card>
+          </Stack>
+          {group.days.map((day) => (
+            <Card key={day.date}>
+              <CardContent>
+                <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
+                  <Box>
+                    <Typography sx={{ fontWeight: 800 }}>{formatDatePtBr(day.date)}</Typography>
+                    <Typography color="text.secondary">
+                      {formatWeekdayLongPtBr(day.date)} · {statusLabels[day.status]}
+                    </Typography>
+                  </Box>
+                  <Chip label={minutesToHoursLabel(day.workedMinutes)} color="secondary" />
+                </Stack>
+                <Divider sx={{ my: 1.5 }} />
+                <RecordMiniList
+                  entries={day.entries}
+                  breaks={day.breaks}
+                  onEdit={onEdit}
+                />
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
       ))}
     </Stack>
   );

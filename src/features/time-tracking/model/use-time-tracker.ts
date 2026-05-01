@@ -55,11 +55,36 @@ function getWeekDays(date: Date) {
 }
 
 function getEntriesForDate(entries: TimeEntry[], date: string) {
-  return entries.filter((entry) => entry.occurredAt.slice(0, 10) === date);
+  return entries.filter((entry) => toDateKey(new Date(entry.occurredAt)) === date);
 }
 
 function getBreaksForDate(breaks: BreakEntry[], date: string) {
   return breaks.filter((entry) => entry.date === date);
+}
+
+function summarizeDates(params: {
+  dates: string[];
+  entries: TimeEntry[];
+  breaks: BreakEntry[];
+  now: Date;
+}) {
+  return params.dates.map((date) =>
+    summarizeDay({
+      date,
+      entries: getEntriesForDate(params.entries, date),
+      breaks: getBreaksForDate(params.breaks, date),
+      now: params.now,
+    }),
+  );
+}
+
+function getRegisteredDates(entries: TimeEntry[], breaks: BreakEntry[]) {
+  return Array.from(
+    new Set([
+      ...entries.map((entry) => toDateKey(new Date(entry.occurredAt))),
+      ...breaks.map((entry) => entry.date),
+    ]),
+  ).sort((first, second) => second.localeCompare(first));
 }
 
 function getCalendarStatus(summary: DailySummary, todayKey: string): CalendarDayStatus {
@@ -174,33 +199,46 @@ export function useTimeTracker(params: {
 
   const dailySummaries = useMemo(
     () =>
-      monthDays.map((date) =>
-        summarizeDay({
-          date,
-          entries: getEntriesForDate(entries, date),
-          breaks: getBreaksForDate(breaks, date),
-          now: today,
-        }),
-      ),
+      summarizeDates({
+        dates: monthDays,
+        entries,
+        breaks,
+        now: today,
+      }),
     [breaks, entries, monthDays, today],
   );
 
   const weekDailySummaries = useMemo(
-    () => dailySummaries.filter((summary) => weekDays.includes(summary.date)),
-    [dailySummaries, weekDays],
+    () =>
+      summarizeDates({
+        dates: weekDays,
+        entries,
+        breaks,
+        now: today,
+      }),
+    [breaks, entries, today, weekDays],
   );
 
   const calendarDailySummaries = useMemo(
     () =>
-      calendarMonthDays.map((date) =>
-        summarizeDay({
-          date,
-          entries: getEntriesForDate(entries, date),
-          breaks: getBreaksForDate(breaks, date),
-          now: today,
-        }),
-      ),
+      summarizeDates({
+        dates: calendarMonthDays,
+        entries,
+        breaks,
+        now: today,
+      }),
     [breaks, calendarMonthDays, entries, today],
+  );
+
+  const historySummaries = useMemo(
+    () =>
+      summarizeDates({
+        dates: getRegisteredDates(entries, breaks),
+        entries,
+        breaks,
+        now: today,
+      }),
+    [breaks, entries, today],
   );
 
   const hasTodayEntries = todayEntries.length > 0;
@@ -280,7 +318,7 @@ export function useTimeTracker(params: {
     setState("loading");
     await createBreakEntry(params.supabase, {
       userId: params.userId,
-      date: startsAt.slice(0, 10),
+      date: toDateKey(new Date(startsAt)),
       category,
       startsAt,
       endsAt,
@@ -324,7 +362,7 @@ export function useTimeTracker(params: {
     await updateBreakEntry(params.supabase, {
       id: breakId,
       userId: params.userId,
-      date: startsAt.slice(0, 10),
+      date: toDateKey(new Date(startsAt)),
       category,
       startsAt,
       endsAt,
@@ -347,6 +385,7 @@ export function useTimeTracker(params: {
     weekWorkedMinutes,
     weekReferenceDelta,
     dailySummaries,
+    historySummaries,
     calendarMonth,
     calendarDays,
     moveCalendarMonth,
