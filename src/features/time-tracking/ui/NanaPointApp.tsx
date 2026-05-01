@@ -2,6 +2,7 @@
 
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
@@ -638,7 +639,7 @@ function CalendarView({
                 sx={{
                   aspectRatio: "1",
                   minHeight: 54,
-                  borderRadius: 2.25,
+                  borderRadius: "12px",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -693,11 +694,11 @@ function CalendarView({
         slotProps={{
           paper: {
             sx: {
-              width: 360,
+              width: 392,
               maxWidth: "calc(100vw - 32px)",
-              borderRadius: 4,
+              borderRadius: "12px",
               border: `1px solid rgba(36, 50, 40, 0.1)`,
-              boxShadow: "0 26px 70px rgba(36, 50, 40, 0.22)",
+              boxShadow: "0 20px 52px rgba(36, 50, 40, 0.22)",
               overflow: "hidden",
             },
           },
@@ -743,27 +744,59 @@ function DayPopoverContent({
   }
 
   return (
-    <Box>
+    <Box sx={{ bgcolor: "#ffffff" }}>
       <Box
         sx={{
-          bgcolor: nanaColors.ink,
-          color: "#ffffff",
-          px: 2.5,
-          py: 2,
-          position: "relative",
+          px: 2,
+          py: 1.75,
+          borderBottom: `1px solid ${nanaColors.line}`,
         }}
       >
-        <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
+        <Stack direction="row" sx={{ alignItems: "flex-start", gap: 1.5 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+              Detalhes do dia
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+              {formatWeekdayLongPtBr(day.date)} · {formatDatePtBr(day.date)}
+            </Typography>
+          </Box>
+          <IconButton
+            aria-label="Fechar detalhes do dia"
+            onClick={onAfterEdit}
+            size="small"
+            sx={{
+              border: `1px solid ${nanaColors.line}`,
+              borderRadius: "8px",
+              color: "text.secondary",
+              "&:hover": { bgcolor: nanaColors.cream },
+            }}
+          >
+            <CloseRoundedIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Stack spacing={1.6} sx={{ p: 2 }}>
+        <Box
+          sx={{
+            border: `2px solid ${nanaColors.orange}`,
+            borderRadius: "10px",
+            p: 1.25,
+            bgcolor: "#fffdf9",
+            boxShadow: "0 8px 20px rgba(245, 124, 0, 0.08)",
+          }}
+        >
+          <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
           <Box
             sx={{
               width: 54,
               height: 54,
-              borderRadius: 2.5,
+              borderRadius: "8px",
               display: "grid",
               placeItems: "center",
-              bgcolor: "#ffffff",
+              bgcolor: nanaColors.orangeSoft,
               color: nanaColors.orange,
-              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.22)",
               flexShrink: 0,
             }}
           >
@@ -776,21 +809,36 @@ function DayPopoverContent({
               </Typography>
             </Box>
           </Box>
-          <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography
-              variant="overline"
-              sx={{ color: "rgba(255,255,255,0.72)", lineHeight: 1.2 }}
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: 800 }}
             >
-              {formatWeekdayLongPtBr(day.date)}
+              {statusLabels[day.dayStatus]}
             </Typography>
-            <Typography variant="h6" sx={{ color: "#ffffff", lineHeight: 1.15 }}>
-              {formatDatePtBr(day.date)}
+            <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", lineHeight: 1.2 }}>
+              {minutesToHoursLabel(day.workedMinutes)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {day.balanceMinutes === 0
+                ? "Sem saldo no dia"
+                : `${balanceLabel} de saldo`}
             </Typography>
           </Box>
-        </Stack>
-      </Box>
+          <Chip
+            label={hasRecords ? `${day.entries.length + day.breaks.length} itens` : "vazio"}
+            size="small"
+            sx={{
+              borderRadius: "6px",
+              bgcolor: hasRecords ? nanaColors.greenSoft : "#f3f0ea",
+              color: hasRecords ? nanaColors.green : nanaColors.muted,
+              fontWeight: 900,
+            }}
+          />
+          </Stack>
+        </Box>
 
-      <Stack spacing={2} sx={{ p: 2 }}>
         <Box
           sx={{
             display: "grid",
@@ -798,16 +846,8 @@ function DayPopoverContent({
             gap: 1,
           }}
         >
-          <PopoverMetric
-            label="Status"
-            value={statusLabels[day.dayStatus]}
-            color={statusColor}
-          />
-          <PopoverMetric
-            label="Jornada"
-            value={minutesToHoursLabel(day.workedMinutes)}
-            color={nanaColors.green}
-          />
+          <PopoverMetric label="Status" value={statusLabels[day.dayStatus]} color={statusColor} />
+          <PopoverMetric label="Jornada" value={minutesToHoursLabel(day.workedMinutes)} color={nanaColors.green} />
           <PopoverMetric
             label="Saldo"
             value={balanceLabel}
@@ -865,7 +905,7 @@ function PopoverMetric({
     <Box
       sx={{
         minHeight: 70,
-        borderRadius: 2.25,
+        borderRadius: "8px",
         border: `1px solid ${nanaColors.line}`,
         bgcolor: "#fffdf9",
         px: 1.25,
@@ -901,7 +941,7 @@ function EmptyDayState() {
   return (
     <Box
       sx={{
-        borderRadius: 3,
+        borderRadius: "10px",
         border: `1px dashed ${nanaColors.line}`,
         bgcolor: nanaColors.cream,
         px: 2,
@@ -984,7 +1024,7 @@ function RecordMiniList({
             gridTemplateColumns: "auto 1fr auto",
             alignItems: "center",
             gap: 1.25,
-            borderRadius: 2.5,
+            borderRadius: "8px",
             border: `1px solid ${nanaColors.line}`,
             bgcolor: "#ffffff",
             px: 1.25,
@@ -996,7 +1036,7 @@ function RecordMiniList({
             sx={{
               width: 64,
               height: 42,
-              borderRadius: 2,
+              borderRadius: "6px",
               display: "grid",
               placeItems: "center",
               bgcolor: `${record.tone}16`,
