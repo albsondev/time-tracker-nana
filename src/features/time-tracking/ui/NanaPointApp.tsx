@@ -637,7 +637,8 @@ function CalendarView({
                 onClick={(event) => openDay(event, day.date)}
                 sx={{
                   aspectRatio: "1",
-                  borderRadius: 2,
+                  minHeight: 54,
+                  borderRadius: 2.25,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -651,8 +652,13 @@ function CalendarView({
                   cursor: "pointer",
                   font: "inherit",
                   p: 0.5,
+                  boxShadow:
+                    day.status === "empty"
+                      ? "inset 0 0 0 1px rgba(36, 50, 40, 0.03)"
+                      : "0 7px 18px rgba(64, 42, 12, 0.08)",
                   "&:hover": {
-                    boxShadow: "0 10px 22px rgba(64, 42, 12, 0.12)",
+                    bgcolor: "#ffffff",
+                    boxShadow: "0 12px 28px rgba(64, 42, 12, 0.16)",
                     transform: "translateY(-1px)",
                   },
                 }}
@@ -687,10 +693,12 @@ function CalendarView({
         slotProps={{
           paper: {
             sx: {
-              width: 320,
+              width: 360,
               maxWidth: "calc(100vw - 32px)",
-              borderRadius: 3,
-              border: `1px solid ${nanaColors.line}`,
+              borderRadius: 4,
+              border: `1px solid rgba(36, 50, 40, 0.1)`,
+              boxShadow: "0 26px 70px rgba(36, 50, 40, 0.22)",
+              overflow: "hidden",
             },
           },
         }}
@@ -718,6 +726,16 @@ function DayPopoverContent({
   onAfterEdit: () => void;
 }) {
   const hasRecords = day.entries.length > 0 || day.breaks.length > 0;
+  const balanceLabel =
+    day.balanceMinutes === 0
+      ? "0min"
+      : minutesToHoursLabel(day.balanceMinutes);
+  const statusColor =
+    day.status === "empty"
+      ? nanaColors.muted
+      : day.status === "negative" || day.status === "pending"
+        ? "#b45309"
+        : nanaColors.green;
 
   function edit(target: EditTarget) {
     onEdit(target);
@@ -725,40 +743,188 @@ function DayPopoverContent({
   }
 
   return (
-    <Stack spacing={1.5} sx={{ p: 2 }}>
-      <Box>
-        <Typography variant="overline" color="text.secondary">
-          {formatWeekdayLongPtBr(day.date)}
-        </Typography>
-        <Typography variant="h6">{formatDatePtBr(day.date)}</Typography>
+    <Box>
+      <Box
+        sx={{
+          bgcolor: nanaColors.ink,
+          color: "#ffffff",
+          px: 2.5,
+          py: 2,
+          position: "relative",
+        }}
+      >
+        <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
+          <Box
+            sx={{
+              width: 54,
+              height: 54,
+              borderRadius: 2.5,
+              display: "grid",
+              placeItems: "center",
+              bgcolor: "#ffffff",
+              color: nanaColors.orange,
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.22)",
+              flexShrink: 0,
+            }}
+          >
+            <Box sx={{ textAlign: "center", lineHeight: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 900 }}>
+                {formatWeekdayShortPtBr(day.date)}
+              </Typography>
+              <Typography sx={{ fontWeight: 900, fontSize: "1.35rem" }}>
+                {day.day}
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              variant="overline"
+              sx={{ color: "rgba(255,255,255,0.72)", lineHeight: 1.2 }}
+            >
+              {formatWeekdayLongPtBr(day.date)}
+            </Typography>
+            <Typography variant="h6" sx={{ color: "#ffffff", lineHeight: 1.15 }}>
+              {formatDatePtBr(day.date)}
+            </Typography>
+          </Box>
+        </Stack>
       </Box>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
-        <Chip label={statusLabels[day.dayStatus]} size="small" />
-        <Chip
-          label={minutesToHoursLabel(day.workedMinutes)}
-          size="small"
-          color="secondary"
-        />
-        {day.balanceMinutes !== 0 && (
-          <Chip
-            label={minutesToHoursLabel(day.balanceMinutes)}
-            size="small"
-            color={day.balanceMinutes > 0 ? "secondary" : "warning"}
+
+      <Stack spacing={2} sx={{ p: 2 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 1,
+          }}
+        >
+          <PopoverMetric
+            label="Status"
+            value={statusLabels[day.dayStatus]}
+            color={statusColor}
           />
-        )}
+          <PopoverMetric
+            label="Jornada"
+            value={minutesToHoursLabel(day.workedMinutes)}
+            color={nanaColors.green}
+          />
+          <PopoverMetric
+            label="Saldo"
+            value={balanceLabel}
+            color={day.balanceMinutes < 0 ? nanaColors.orange : nanaColors.green}
+          />
+        </Box>
+
+        <Box>
+          <Stack
+            direction="row"
+            sx={{
+              alignItems: "center",
+              justifyContent: "space-between",
+              mb: 1.25,
+            }}
+          >
+            <Typography sx={{ fontWeight: 900 }}>Histórico do dia</Typography>
+            {hasRecords && (
+              <Chip
+                label={`${day.entries.length + day.breaks.length} registros`}
+                size="small"
+                sx={{
+                  bgcolor: nanaColors.greenSoft,
+                  color: nanaColors.green,
+                  height: 24,
+                }}
+              />
+            )}
+          </Stack>
+          {!hasRecords ? (
+            <EmptyDayState />
+          ) : (
+            <RecordMiniList
+              entries={day.entries}
+              breaks={day.breaks}
+              onEdit={edit}
+            />
+          )}
+        </Box>
       </Stack>
-      <Divider />
-      {!hasRecords && (
-        <Typography color="text.secondary">
-          Nenhum registro salvo nesta data.
-        </Typography>
-      )}
-      <RecordMiniList
-        entries={day.entries}
-        breaks={day.breaks}
-        onEdit={edit}
+    </Box>
+  );
+}
+
+function PopoverMetric({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <Box
+      sx={{
+        minHeight: 70,
+        borderRadius: 2.25,
+        border: `1px solid ${nanaColors.line}`,
+        bgcolor: "#fffdf9",
+        px: 1.25,
+        py: 1,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+      }}
+    >
+      <Typography
+        variant="caption"
+        sx={{ color: "text.secondary", fontWeight: 800, lineHeight: 1.1 }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          color,
+          fontWeight: 900,
+          fontSize: "0.88rem",
+          lineHeight: 1.15,
+          mt: 0.5,
+          overflowWrap: "anywhere",
+        }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
+function EmptyDayState() {
+  return (
+    <Box
+      sx={{
+        borderRadius: 3,
+        border: `1px dashed ${nanaColors.line}`,
+        bgcolor: nanaColors.cream,
+        px: 2,
+        py: 2.25,
+        textAlign: "center",
+      }}
+    >
+      <CalendarMonthRoundedIcon
+        sx={{
+          color: nanaColors.orange,
+          bgcolor: "#ffffff",
+          borderRadius: "50%",
+          p: 0.75,
+          fontSize: 38,
+          boxShadow: "0 8px 24px rgba(245, 124, 0, 0.18)",
+          mb: 1,
+        }}
       />
-    </Stack>
+      <Typography sx={{ fontWeight: 900 }}>Sem registros nesta data</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+        Quando houver ponto ou pausa, o resumo aparece aqui.
+      </Typography>
+    </Box>
   );
 }
 
@@ -787,17 +953,21 @@ function RecordMiniList({
     ...entries.map((entry) => ({
       id: `time-${entry.id}`,
       at: entry.occurredAt,
+      time: formatTimePtBr(entry.occurredAt),
       label: actionLabels[entry.type],
       caption: entry.note,
       isModified: entry.isModified,
+      tone: nanaColors.green,
       onEdit: () => onEdit({ kind: "time", entry }),
     })),
     ...breaks.map((entry) => ({
       id: `break-${entry.id}`,
       at: entry.startsAt,
-      label: `${breakLabels[entry.category]} ${formatTimePtBr(entry.startsAt)}-${entry.endsAt ? formatTimePtBr(entry.endsAt) : "aberta"}`,
+      time: `${formatTimePtBr(entry.startsAt)}-${entry.endsAt ? formatTimePtBr(entry.endsAt) : "aberta"}`,
+      label: breakLabels[entry.category],
       caption: entry.note,
       isModified: entry.isModified,
+      tone: nanaColors.orange,
       onEdit: () => onEdit({ kind: "break", entry }),
     })),
   ].sort((first, second) => first.at.localeCompare(second.at));
@@ -805,32 +975,71 @@ function RecordMiniList({
   if (records.length === 0) return null;
 
   return (
-    <Stack spacing={1}>
+    <Stack spacing={1.1}>
       {records.map((record) => (
-        <Stack
+        <Box
           key={record.id}
-          direction="row"
           sx={{
+            display: "grid",
+            gridTemplateColumns: "auto 1fr auto",
             alignItems: "center",
-            justifyContent: "space-between",
-            gap: 1,
-            py: 0.5,
+            gap: 1.25,
+            borderRadius: 2.5,
+            border: `1px solid ${nanaColors.line}`,
+            bgcolor: "#ffffff",
+            px: 1.25,
+            py: 1,
+            boxShadow: "0 8px 22px rgba(64, 42, 12, 0.06)",
           }}
         >
+          <Box
+            sx={{
+              width: 64,
+              height: 42,
+              borderRadius: 2,
+              display: "grid",
+              placeItems: "center",
+              bgcolor: `${record.tone}16`,
+              color: record.tone,
+              fontWeight: 900,
+              fontSize: "0.72rem",
+              lineHeight: 1.1,
+              textAlign: "center",
+            }}
+          >
+            {record.time}
+          </Box>
           <Box sx={{ minWidth: 0 }}>
-            <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
-              <Typography sx={{ fontWeight: 800 }}>
-                {formatTimePtBr(record.at)}
+            <Stack
+              direction="row"
+              spacing={0.75}
+              sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 0.5 }}
+            >
+              <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                {record.label}
               </Typography>
               {record.isModified && (
-                <Chip label="editado" color="warning" size="small" />
+                <Chip
+                  label="editado"
+                  size="small"
+                  sx={{
+                    height: 22,
+                    bgcolor: "#fff3e0",
+                    color: "#b45309",
+                    "& .MuiChip-label": { px: 0.8 },
+                  }}
+                />
               )}
             </Stack>
-            <Typography variant="body2" color="text.secondary">
-              {record.label}
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+              {record.time}
             </Typography>
             {record.caption && (
-              <Typography variant="caption" color="text.secondary">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mt: 0.35 }}
+              >
                 {record.caption}
               </Typography>
             )}
@@ -840,10 +1049,14 @@ function RecordMiniList({
             color="primary"
             size="small"
             onClick={record.onEdit}
+            sx={{
+              bgcolor: nanaColors.orangeSoft,
+              "&:hover": { bgcolor: "#ffe0b2" },
+            }}
           >
             <EditRoundedIcon fontSize="small" />
           </IconButton>
-        </Stack>
+        </Box>
       ))}
     </Stack>
   );
