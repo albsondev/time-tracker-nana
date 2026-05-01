@@ -6,11 +6,13 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import KeyboardDoubleArrowLeftRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowLeftRounded";
 import KeyboardDoubleArrowRightRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowRightRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
 import type { Session } from "@supabase/supabase-js";
@@ -33,6 +35,7 @@ import {
   Divider,
   FormControl,
   IconButton,
+  InputAdornment,
   InputLabel,
   MenuItem,
   Popover,
@@ -55,7 +58,12 @@ import {
   minutesToHoursLabel,
   toDateKey,
 } from "@/domain/time/format";
-import type { BreakCategory, BreakEntry, TimeEntry } from "@/domain/time/types";
+import type {
+  BreakCategory,
+  BreakEntry,
+  DailySummary,
+  TimeEntry,
+} from "@/domain/time/types";
 import { getSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { fadeUp, springy, staggerContainer } from "@/shared/motion/presets";
 import { nanaColors } from "@/shared/theme/nana-theme";
@@ -67,6 +75,14 @@ type Tab = "today" | "calendar" | "bank" | "history" | "profile";
 type EditTarget =
   | { kind: "time"; entry: TimeEntry }
   | { kind: "break"; entry: BreakEntry };
+
+type HistoryLimitFilter =
+  | "all"
+  | "exceeded"
+  | "negative"
+  | "pending"
+  | "complete"
+  | "edited";
 
 const actionLabels: Record<TimeEntry["type"], string> = {
   arrival: "Cheguei no trabalho",
@@ -125,6 +141,36 @@ function toTimeInputValue(isoDate: string) {
 
 function toEditableIso(date: string, time: string) {
   return new Date(`${date}T${time}:00`).toISOString();
+}
+
+function recordMatchesSearch(
+  day: DailySummary,
+  query: string,
+) {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  if (!normalizedQuery) return true;
+
+  const haystack = [
+    formatDatePtBr(day.date),
+    formatWeekdayLongPtBr(day.date),
+    statusLabels[day.status],
+    ...day.entries.flatMap((entry) => [
+      actionLabels[entry.type],
+      entry.note ?? "",
+      formatTimePtBr(entry.occurredAt),
+    ]),
+    ...day.breaks.flatMap((entry) => [
+      breakLabels[entry.category],
+      entry.note ?? "",
+      formatTimePtBr(entry.startsAt),
+      entry.endsAt ? formatTimePtBr(entry.endsAt) : "",
+    ]),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(normalizedQuery);
 }
 
 export function NanaPointApp() {
@@ -1387,18 +1433,69 @@ function HistoryView({
   tracker: ReturnType<typeof useTimeTracker>;
   onEdit: (target: EditTarget) => void;
 }) {
+  const [search, setSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [limitFilter, setLimitFilter] = useState<HistoryLimitFilter>("all");
+  const [entryType, setEntryType] = useState<TimeEntry["type"] | "all">("all");
+  const [breakCategory, setBreakCategory] = useState<BreakCategory | "all">("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
   const workedThisMonth = tracker.dailySummaries.reduce(
     (total, day) => total + day.workedMinutes,
     0,
   );
   const registeredDays = tracker.historySummaries;
-  const monthLabel = registeredDays.length > 0
+  const hasCurrentMonthEntries = tracker.dailySummaries.some(
+    (day) => day.entries.length > 0 || day.breaks.length > 0,
+  );
+  const monthLabel = hasCurrentMonthEntries
     ? minutesToHoursLabel(workedThisMonth)
     : "Sem registros";
   const pausesLabel = tracker.breaks.length > 0
     ? String(tracker.breaks.length)
     : "Sem pausas";
-  const historyGroups = registeredDays.reduce<
+  const filteredDays = registeredDays.filter((day) => {
+    const matchesSearch = recordMatchesSearch(day, search);
+    const matchesStart = !startDate || day.date >= startDate;
+    const matchesEnd = !endDate || day.date <= endDate;
+    const matchesEntryType =
+      entryType === "all" || day.entries.some((entry) => entry.type === entryType);
+    const matchesBreakCategory =
+      breakCategory === "all" ||
+      day.breaks.some((entry) => entry.category === breakCategory);
+    const matchesLimit =
+      limitFilter === "all" ||
+      (limitFilter === "exceeded" && day.balanceMinutes > 0) ||
+      (limitFilter === "negative" && day.balanceMinutes < 0) ||
+      (limitFilter === "pending" && day.status !== "closed") ||
+      (limitFilter === "complete" && day.status === "closed") ||
+      (limitFilter === "edited" &&
+        [...day.entries, ...day.breaks].some((entry) => entry.isModified));
+
+    return (
+      matchesSearch &&
+      matchesStart &&
+      matchesEnd &&
+      matchesEntryType &&
+      matchesBreakCategory &&
+      matchesLimit
+    );
+  });
+  const totalPages = Math.max(1, Math.ceil(filteredDays.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const visibleDays = filteredDays.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+  const hasActiveFilters =
+    search ||
+    startDate ||
+    endDate ||
+    limitFilter !== "all" ||
+    entryType !== "all" ||
+    breakCategory !== "all";
+  const historyGroups = visibleDays.reduce<
     { monthKey: string; days: typeof registeredDays; workedMinutes: number }[]
   >((groups, day) => {
     const monthKey = day.date.slice(0, 7);
@@ -1419,6 +1516,16 @@ function HistoryView({
     return groups;
   }, []);
 
+  function resetFilters() {
+    setSearch("");
+    setStartDate("");
+    setEndDate("");
+    setLimitFilter("all");
+    setEntryType("all");
+    setBreakCategory("all");
+    setPage(1);
+  }
+
   return (
     <Stack spacing={2}>
       <SectionTitle title="Histórico" subtitle="Resumo mensal e rastreabilidade" />
@@ -1435,8 +1542,48 @@ function HistoryView({
           ["Pausas", pausesLabel, "Registradas"],
         ]}
       />
+      <HistoryFilters
+        breakCategory={breakCategory}
+        endDate={endDate}
+        entryType={entryType}
+        hasActiveFilters={Boolean(hasActiveFilters)}
+        limitFilter={limitFilter}
+        resultCount={filteredDays.length}
+        search={search}
+        startDate={startDate}
+        onBreakCategoryChange={(value) => {
+          setBreakCategory(value);
+          setPage(1);
+        }}
+        onEndDateChange={(value) => {
+          setEndDate(value);
+          setPage(1);
+        }}
+        onEntryTypeChange={(value) => {
+          setEntryType(value);
+          setPage(1);
+        }}
+        onLimitFilterChange={(value) => {
+          setLimitFilter(value);
+          setPage(1);
+        }}
+        onReset={resetFilters}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        onStartDateChange={(value) => {
+          setStartDate(value);
+          setPage(1);
+        }}
+      />
       {registeredDays.length === 0 && (
         <Alert severity="info">Nenhum registro salvo neste mês ainda.</Alert>
+      )}
+      {registeredDays.length > 0 && filteredDays.length === 0 && (
+        <Alert severity="info">
+          Nenhum dia encontrado com os filtros selecionados.
+        </Alert>
       )}
       {historyGroups.map((group) => (
         <Stack key={group.monthKey} spacing={1.2}>
@@ -1463,29 +1610,328 @@ function HistoryView({
             />
           </Stack>
           {group.days.map((day) => (
-            <Card key={day.date}>
-              <CardContent>
-                <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
-                  <Box>
-                    <Typography sx={{ fontWeight: 800 }}>{formatDatePtBr(day.date)}</Typography>
-                    <Typography color="text.secondary">
-                      {formatWeekdayLongPtBr(day.date)} · {statusLabels[day.status]}
-                    </Typography>
-                  </Box>
-                  <Chip label={minutesToHoursLabel(day.workedMinutes)} color="secondary" />
-                </Stack>
-                <Divider sx={{ my: 1.5 }} />
-                <RecordMiniList
-                  entries={day.entries}
-                  breaks={day.breaks}
-                  onEdit={onEdit}
-                />
-              </CardContent>
-            </Card>
+            <HistoryDayCard day={day} key={day.date} onEdit={onEdit} />
           ))}
         </Stack>
       ))}
+      {filteredDays.length > pageSize && (
+        <HistoryPagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={filteredDays.length}
+          totalPages={totalPages}
+          onNext={() => setPage((current) => Math.min(current + 1, totalPages))}
+          onPrevious={() => setPage((current) => Math.max(current - 1, 1))}
+        />
+      )}
     </Stack>
+  );
+}
+
+function HistoryFilters({
+  breakCategory,
+  endDate,
+  entryType,
+  hasActiveFilters,
+  limitFilter,
+  resultCount,
+  search,
+  startDate,
+  onBreakCategoryChange,
+  onEndDateChange,
+  onEntryTypeChange,
+  onLimitFilterChange,
+  onReset,
+  onSearchChange,
+  onStartDateChange,
+}: {
+  breakCategory: BreakCategory | "all";
+  endDate: string;
+  entryType: TimeEntry["type"] | "all";
+  hasActiveFilters: boolean;
+  limitFilter: HistoryLimitFilter;
+  resultCount: number;
+  search: string;
+  startDate: string;
+  onBreakCategoryChange: (value: BreakCategory | "all") => void;
+  onEndDateChange: (value: string) => void;
+  onEntryTypeChange: (value: TimeEntry["type"] | "all") => void;
+  onLimitFilterChange: (value: HistoryLimitFilter) => void;
+  onReset: () => void;
+  onSearchChange: (value: string) => void;
+  onStartDateChange: (value: string) => void;
+}) {
+  return (
+    <Card>
+      <CardContent sx={{ p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack
+            direction="row"
+            sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}
+          >
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <FilterListRoundedIcon color="primary" />
+              <Box>
+                <Typography sx={{ fontWeight: 900 }}>Filtros</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {resultCount} dias encontrados
+                </Typography>
+              </Box>
+            </Stack>
+            <Button
+              disabled={!hasActiveFilters}
+              onClick={onReset}
+              size="small"
+              sx={{ borderRadius: "8px" }}
+            >
+              Limpar
+            </Button>
+          </Stack>
+          <TextField
+            label="Buscar"
+            placeholder="Dia, horário, observação..."
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchRoundedIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+            fullWidth
+          />
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
+              gap: 1,
+            }}
+          >
+            <TextField
+              label="Data inicial"
+              type="date"
+              value={startDate}
+              onChange={(event) => onStartDateChange(event.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              fullWidth
+            />
+            <TextField
+              label="Data final"
+              type="date"
+              value={endDate}
+              onChange={(event) => onEndDateChange(event.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              fullWidth
+            />
+            <FormControl fullWidth>
+              <InputLabel>Situação</InputLabel>
+              <Select
+                label="Situação"
+                value={limitFilter}
+                onChange={(event) =>
+                  onLimitFilterChange(event.target.value as HistoryLimitFilter)
+                }
+              >
+                <MenuItem value="all">Todas</MenuItem>
+                <MenuItem value="exceeded">Passou do limite</MenuItem>
+                <MenuItem value="negative">Saldo negativo</MenuItem>
+                <MenuItem value="pending">Pendentes</MenuItem>
+                <MenuItem value="complete">Fechados</MenuItem>
+                <MenuItem value="edited">Editados</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Registro</InputLabel>
+              <Select
+                label="Registro"
+                value={entryType}
+                onChange={(event) =>
+                  onEntryTypeChange(event.target.value as TimeEntry["type"] | "all")
+                }
+              >
+                <MenuItem value="all">Todos</MenuItem>
+                {Object.entries(actionLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth sx={{ gridColumn: { sm: "1 / -1" } }}>
+              <InputLabel>Pausa</InputLabel>
+              <Select
+                label="Pausa"
+                value={breakCategory}
+                onChange={(event) =>
+                  onBreakCategoryChange(event.target.value as BreakCategory | "all")
+                }
+              >
+                <MenuItem value="all">Todas</MenuItem>
+                {Object.entries(breakLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HistoryDayCard({
+  day,
+  onEdit,
+}: {
+  day: DailySummary;
+  onEdit: (target: EditTarget) => void;
+}) {
+  const sortedEntries = [...day.entries].sort((first, second) =>
+    first.occurredAt.localeCompare(second.occurredAt),
+  );
+  const arrival = sortedEntries.find((entry) => entry.type === "arrival");
+  const departure = sortedEntries.find((entry) => entry.type === "departure");
+  const lunchStart = sortedEntries.find((entry) => entry.type === "lunch_start");
+  const lunchEnd = sortedEntries.find((entry) => entry.type === "lunch_end");
+  const hasEdits = [...day.entries, ...day.breaks].some((entry) => entry.isModified);
+
+  return (
+    <Card component={motion.article} whileHover={{ y: -2 }}>
+      <CardContent>
+        <Stack spacing={1.5}>
+          <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
+            <Box>
+              <Typography sx={{ fontWeight: 900 }}>{formatDatePtBr(day.date)}</Typography>
+              <Typography color="text.secondary">
+                {formatWeekdayLongPtBr(day.date)} · {statusLabels[day.status]}
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: "flex-start" }}>
+              {hasEdits && (
+                <Chip label="editado" color="warning" size="small" />
+              )}
+              <Chip label={minutesToHoursLabel(day.workedMinutes)} color="secondary" />
+            </Stack>
+          </Stack>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" },
+              gap: 1,
+            }}
+          >
+            <HistoryMiniMetric
+              label="Entrada"
+              value={arrival ? formatTimePtBr(arrival.occurredAt) : "-"}
+            />
+            <HistoryMiniMetric
+              label="Almoço"
+              value={
+                lunchStart || lunchEnd
+                  ? `${lunchStart ? formatTimePtBr(lunchStart.occurredAt) : "--:--"}-${
+                      lunchEnd ? formatTimePtBr(lunchEnd.occurredAt) : "--:--"
+                    }`
+                  : "-"
+              }
+            />
+            <HistoryMiniMetric
+              label="Saída"
+              value={departure ? formatTimePtBr(departure.occurredAt) : "-"}
+            />
+            <HistoryMiniMetric label="Pausas" value={String(day.breaks.length)} />
+          </Box>
+          <Divider />
+          <RecordMiniList
+            entries={day.entries}
+            breaks={day.breaks}
+            onEdit={onEdit}
+          />
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HistoryMiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <Box
+      sx={{
+        border: `1px solid ${nanaColors.line}`,
+        borderRadius: "8px",
+        bgcolor: "#f8fafc",
+        px: 1,
+        py: 0.85,
+      }}
+    >
+      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>
+        {label}
+      </Typography>
+      <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>{value}</Typography>
+    </Box>
+  );
+}
+
+function HistoryPagination({
+  currentPage,
+  pageSize,
+  totalItems,
+  totalPages,
+  onNext,
+  onPrevious,
+}: {
+  currentPage: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  onNext: () => void;
+  onPrevious: () => void;
+}) {
+  const firstItem = (currentPage - 1) * pageSize + 1;
+  const lastItem = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <Card>
+      <CardContent sx={{ py: 1.5 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          sx={{
+            alignItems: { xs: "stretch", sm: "center" },
+            justifyContent: "space-between",
+            gap: 1,
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            Exibindo {firstItem}-{lastItem} de {totalItems} dias
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button
+              disabled={currentPage <= 1}
+              onClick={onPrevious}
+              variant="outlined"
+              sx={{ borderRadius: "8px" }}
+              fullWidth
+            >
+              Anterior
+            </Button>
+            <Chip label={`${currentPage}/${totalPages}`} sx={{ borderRadius: "8px" }} />
+            <Button
+              disabled={currentPage >= totalPages}
+              onClick={onNext}
+              variant="contained"
+              sx={{ borderRadius: "8px" }}
+              fullWidth
+            >
+              Próxima
+            </Button>
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
