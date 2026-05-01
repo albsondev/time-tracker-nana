@@ -6,6 +6,7 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
@@ -27,6 +28,7 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Collapse,
   Container,
   Dialog,
   DialogActions,
@@ -1440,6 +1442,9 @@ function HistoryView({
   const [entryType, setEntryType] = useState<TimeEntry["type"] | "all">("all");
   const [breakCategory, setBreakCategory] = useState<BreakCategory | "all">("all");
   const [page, setPage] = useState(1);
+  const [expandedHistoryDate, setExpandedHistoryDate] = useState<
+    string | "none" | null
+  >(null);
   const pageSize = 5;
   const workedThisMonth = tracker.dailySummaries.reduce(
     (total, day) => total + day.workedMinutes,
@@ -1488,6 +1493,14 @@ function HistoryView({
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
   );
+  const defaultExpandedDate = visibleDays[0]?.date ?? null;
+  const expandedDate =
+    expandedHistoryDate === "none"
+      ? null
+      : expandedHistoryDate &&
+          visibleDays.some((day) => day.date === expandedHistoryDate)
+        ? expandedHistoryDate
+        : defaultExpandedDate;
   const hasActiveFilters =
     search ||
     startDate ||
@@ -1524,6 +1537,12 @@ function HistoryView({
     setEntryType("all");
     setBreakCategory("all");
     setPage(1);
+    setExpandedHistoryDate(null);
+  }
+
+  function resetPageAndExpansion() {
+    setPage(1);
+    setExpandedHistoryDate(null);
   }
 
   return (
@@ -1553,28 +1572,28 @@ function HistoryView({
         startDate={startDate}
         onBreakCategoryChange={(value) => {
           setBreakCategory(value);
-          setPage(1);
+          resetPageAndExpansion();
         }}
         onEndDateChange={(value) => {
           setEndDate(value);
-          setPage(1);
+          resetPageAndExpansion();
         }}
         onEntryTypeChange={(value) => {
           setEntryType(value);
-          setPage(1);
+          resetPageAndExpansion();
         }}
         onLimitFilterChange={(value) => {
           setLimitFilter(value);
-          setPage(1);
+          resetPageAndExpansion();
         }}
         onReset={resetFilters}
         onSearchChange={(value) => {
           setSearch(value);
-          setPage(1);
+          resetPageAndExpansion();
         }}
         onStartDateChange={(value) => {
           setStartDate(value);
-          setPage(1);
+          resetPageAndExpansion();
         }}
       />
       {registeredDays.length === 0 && (
@@ -1610,7 +1629,17 @@ function HistoryView({
             />
           </Stack>
           {group.days.map((day) => (
-            <HistoryDayCard day={day} key={day.date} onEdit={onEdit} />
+            <HistoryDayCard
+              day={day}
+              expanded={expandedDate === day.date}
+              key={day.date}
+              onEdit={onEdit}
+              onToggle={() =>
+                setExpandedHistoryDate(
+                  expandedDate === day.date ? "none" : day.date,
+                )
+              }
+            />
           ))}
         </Stack>
       ))}
@@ -1620,8 +1649,14 @@ function HistoryView({
           pageSize={pageSize}
           totalItems={filteredDays.length}
           totalPages={totalPages}
-          onNext={() => setPage((current) => Math.min(current + 1, totalPages))}
-          onPrevious={() => setPage((current) => Math.max(current - 1, 1))}
+          onNext={() => {
+            setPage((current) => Math.min(current + 1, totalPages));
+            setExpandedHistoryDate(null);
+          }}
+          onPrevious={() => {
+            setPage((current) => Math.max(current - 1, 1));
+            setExpandedHistoryDate(null);
+          }}
         />
       )}
     </Stack>
@@ -1786,10 +1821,14 @@ function HistoryFilters({
 
 function HistoryDayCard({
   day,
+  expanded,
   onEdit,
+  onToggle,
 }: {
   day: DailySummary;
+  expanded: boolean;
   onEdit: (target: EditTarget) => void;
+  onToggle: () => void;
 }) {
   const sortedEntries = [...day.entries].sort((first, second) =>
     first.occurredAt.localeCompare(second.occurredAt),
@@ -1845,12 +1884,42 @@ function HistoryDayCard({
             />
             <HistoryMiniMetric label="Pausas" value={String(day.breaks.length)} />
           </Box>
-          <Divider />
-          <RecordMiniList
-            entries={day.entries}
-            breaks={day.breaks}
-            onEdit={onEdit}
-          />
+          <Button
+            aria-expanded={expanded}
+            aria-label={
+              expanded
+                ? `Recolher registros de ${formatDatePtBr(day.date)}`
+                : `Expandir registros de ${formatDatePtBr(day.date)}`
+            }
+            color="secondary"
+            endIcon={
+              <ExpandMoreRoundedIcon
+                sx={{
+                  transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 180ms ease",
+                }}
+              />
+            }
+            onClick={onToggle}
+            sx={{
+              alignSelf: "flex-start",
+              borderRadius: "8px",
+              px: 1.25,
+            }}
+            variant={expanded ? "contained" : "outlined"}
+          >
+            {expanded ? "Ocultar registros" : "Ver registros"}
+          </Button>
+          <Collapse in={expanded} timeout="auto" unmountOnExit>
+            <Stack spacing={1.5} sx={{ pt: 0.25 }}>
+              <Divider />
+              <RecordMiniList
+                entries={day.entries}
+                breaks={day.breaks}
+                onEdit={onEdit}
+              />
+            </Stack>
+          </Collapse>
         </Stack>
       </CardContent>
     </Card>
