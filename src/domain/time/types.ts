@@ -36,6 +36,8 @@ export type TimeEntry = {
   occurredAt: string;
   type: TimeEntryType;
   note?: string;
+  isModified?: boolean;
+  modifiedAt?: string;
 };
 
 export type BreakEntry = {
@@ -47,6 +49,8 @@ export type BreakEntry = {
   endsAt?: string;
   note?: string;
   deductsFromWork: boolean;
+  isModified?: boolean;
+  modifiedAt?: string;
 };
 
 export type DailySummary = {

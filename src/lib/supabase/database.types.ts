@@ -31,6 +31,8 @@ export type Database = {
           occurred_at: string;
           type: string;
           note: string | null;
+          is_modified: boolean;
+          modified_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -39,12 +41,16 @@ export type Database = {
           occurred_at: string;
           type: string;
           note?: string | null;
+          is_modified?: boolean;
+          modified_at?: string | null;
           created_at?: string;
         };
         Update: {
           occurred_at?: string;
           type?: string;
           note?: string | null;
+          is_modified?: boolean;
+          modified_at?: string | null;
         };
       };
       break_entries: {
@@ -57,6 +63,8 @@ export type Database = {
           ends_at: string | null;
           deducts_from_work: boolean;
           note: string | null;
+          is_modified: boolean;
+          modified_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -68,6 +76,8 @@ export type Database = {
           ends_at?: string | null;
           deducts_from_work?: boolean;
           note?: string | null;
+          is_modified?: boolean;
+          modified_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -76,6 +86,9 @@ export type Database = {
           ends_at?: string | null;
           deducts_from_work?: boolean;
           note?: string | null;
+          work_date?: string;
+          is_modified?: boolean;
+          modified_at?: string | null;
         };
       };
       hour_bank_movements: {

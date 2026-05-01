@@ -21,6 +21,8 @@ import {
   createBreakEntry,
   createTimeEntry,
   loadUserTimeTrackingSnapshot,
+  updateBreakEntry,
+  updateTimeEntry,
 } from "../data/time-tracking-repository";
 
 export type TimeTrackerState = ReturnType<typeof useTimeTracker>;
@@ -197,6 +199,9 @@ export function useTimeTracker(params: {
         status: getCalendarStatus(summary, todayKey),
         workedMinutes: summary.workedMinutes,
         balanceMinutes: summary.balanceMinutes,
+        entries: summary.entries,
+        breaks: summary.breaks,
+        dayStatus: summary.status,
       })),
     [dailySummaries, todayKey],
   );
@@ -246,6 +251,50 @@ export function useTimeTracker(params: {
     await reload();
   }
 
+  async function editTimeEntry(
+    entryId: string,
+    type: TimeEntry["type"],
+    occurredAt: string,
+    note?: string,
+  ) {
+    if (!params.supabase || !params.userId) return;
+
+    setState("loading");
+    await updateTimeEntry(params.supabase, {
+      id: entryId,
+      userId: params.userId,
+      type,
+      occurredAt,
+      note,
+    });
+    await reload();
+  }
+
+  async function editBreak(
+    breakId: string,
+    category: BreakCategory,
+    startsAt: string,
+    endsAt: string,
+    note?: string,
+  ) {
+    if (!params.supabase || !params.userId) return;
+
+    const deductsFromWork = !["medical", "sick"].includes(category);
+
+    setState("loading");
+    await updateBreakEntry(params.supabase, {
+      id: breakId,
+      userId: params.userId,
+      date: startsAt.slice(0, 10),
+      category,
+      startsAt,
+      endsAt,
+      deductsFromWork,
+      note,
+    });
+    await reload();
+  }
+
   return {
     today,
     todayKey,
@@ -267,5 +316,7 @@ export function useTimeTracker(params: {
     reload,
     addTimeEntry,
     addBreak,
+    editTimeEntry,
+    editBreak,
   };
 }

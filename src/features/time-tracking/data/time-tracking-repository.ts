@@ -31,12 +31,14 @@ export async function loadUserTimeTrackingSnapshot(
   const [entriesResult, breaksResult, movementsResult] = await Promise.all([
     supabase
       .from("time_entries")
-      .select("id,user_id,occurred_at,type,note")
+      .select("id,user_id,occurred_at,type,note,is_modified,modified_at")
       .eq("user_id", userId)
       .order("occurred_at", { ascending: true }),
     supabase
       .from("break_entries")
-      .select("id,user_id,work_date,category,starts_at,ends_at,deducts_from_work,note")
+      .select(
+        "id,user_id,work_date,category,starts_at,ends_at,deducts_from_work,note,is_modified,modified_at",
+      )
       .eq("user_id", userId)
       .order("starts_at", { ascending: true }),
     supabase
@@ -58,6 +60,8 @@ export async function loadUserTimeTrackingSnapshot(
         occurredAt: entry.occurred_at,
         type: entry.type as TimeEntry["type"],
         note: entry.note ?? undefined,
+        isModified: entry.is_modified,
+        modifiedAt: entry.modified_at ?? undefined,
       })) ?? [],
     breaks:
       breaksResult.data?.map((entry) => ({
@@ -69,6 +73,8 @@ export async function loadUserTimeTrackingSnapshot(
         endsAt: entry.ends_at ?? undefined,
         deductsFromWork: entry.deducts_from_work,
         note: entry.note ?? undefined,
+        isModified: entry.is_modified,
+        modifiedAt: entry.modified_at ?? undefined,
       })) ?? [],
     movements:
       movementsResult.data?.map((movement) => ({
@@ -95,6 +101,25 @@ export async function createTimeEntry(
   if (error) throw error;
 }
 
+export async function updateTimeEntry(
+  supabase: SupabaseClient,
+  entry: Pick<TimeEntry, "id" | "userId" | "occurredAt" | "type" | "note">,
+) {
+  const { error } = await supabase
+    .from("time_entries")
+    .update({
+      occurred_at: entry.occurredAt,
+      type: entry.type,
+      note: entry.note ?? null,
+      is_modified: true,
+      modified_at: new Date().toISOString(),
+    })
+    .eq("id", entry.id)
+    .eq("user_id", entry.userId);
+
+  if (error) throw error;
+}
+
 export async function createBreakEntry(
   supabase: SupabaseClient,
   entry: Omit<BreakEntry, "id">,
@@ -108,6 +133,38 @@ export async function createBreakEntry(
     deducts_from_work: entry.deductsFromWork,
     note: entry.note ?? null,
   });
+
+  if (error) throw error;
+}
+
+export async function updateBreakEntry(
+  supabase: SupabaseClient,
+  entry: Pick<
+    BreakEntry,
+    | "id"
+    | "userId"
+    | "date"
+    | "category"
+    | "startsAt"
+    | "endsAt"
+    | "deductsFromWork"
+    | "note"
+  >,
+) {
+  const { error } = await supabase
+    .from("break_entries")
+    .update({
+      work_date: entry.date,
+      category: entry.category,
+      starts_at: entry.startsAt,
+      ends_at: entry.endsAt ?? null,
+      deducts_from_work: entry.deductsFromWork,
+      note: entry.note ?? null,
+      is_modified: true,
+      modified_at: new Date().toISOString(),
+    })
+    .eq("id", entry.id)
+    .eq("user_id", entry.userId);
 
   if (error) throw error;
 }
