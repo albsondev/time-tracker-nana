@@ -4,6 +4,8 @@ import type { BreakEntry, HourBankMovement, TimeEntry } from "@/domain/time/type
 export type UserProfile = {
   id: string;
   displayName: string | null;
+  lastLoginAt?: string;
+  lastSeenAt?: string;
 };
 
 export type TimeTrackingSnapshot = {
@@ -19,6 +21,8 @@ export async function upsertUserProfile(
   const { error } = await supabase.from("profiles").upsert({
     id: profile.id,
     display_name: profile.displayName,
+    last_login_at: profile.lastLoginAt,
+    last_seen_at: profile.lastSeenAt,
   });
 
   if (error) throw error;

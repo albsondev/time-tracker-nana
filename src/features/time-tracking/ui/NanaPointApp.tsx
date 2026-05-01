@@ -154,9 +154,21 @@ export function NanaPointApp() {
 
     const {
       data: { subscription },
-    } = client.auth.onAuthStateChange((_event, nextSession) => {
+    } = client.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       setAuthLoading(false);
+
+      if (event === "SIGNED_IN" && nextSession) {
+        const now = new Date().toISOString();
+        queueMicrotask(() => {
+          void upsertUserProfile(client, {
+            id: nextSession.user.id,
+            displayName: getDisplayName(nextSession),
+            lastLoginAt: now,
+            lastSeenAt: now,
+          });
+        });
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -168,6 +180,7 @@ export function NanaPointApp() {
     void upsertUserProfile(supabase, {
       id: session.user.id,
       displayName: getDisplayName(session),
+      lastSeenAt: new Date().toISOString(),
     });
   }, [session, supabase]);
 

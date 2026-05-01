@@ -13,15 +13,21 @@ export type Database = {
         Row: {
           id: string;
           display_name: string | null;
+          last_login_at: string | null;
+          last_seen_at: string | null;
           created_at: string;
         };
         Insert: {
           id: string;
           display_name?: string | null;
+          last_login_at?: string | null;
+          last_seen_at?: string | null;
           created_at?: string;
         };
         Update: {
           display_name?: string | null;
+          last_login_at?: string | null;
+          last_seen_at?: string | null;
         };
       };
       time_entries: {
