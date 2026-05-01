@@ -2,12 +2,17 @@
 
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import KeyboardDoubleArrowLeftRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowLeftRounded";
+import KeyboardDoubleArrowRightRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowRightRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
+import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
 import type { Session } from "@supabase/supabase-js";
 import {
   Alert,
@@ -34,10 +39,11 @@ import {
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import {
   formatDatePtBr,
@@ -610,6 +616,9 @@ function CalendarView({
   const selectedDay =
     tracker.calendarDays.find((day) => day.date === selectedDate) ?? null;
   const popoverOpen = Boolean(anchorEl && selectedDay);
+  const isCurrentMonth =
+    tracker.calendarMonth.getFullYear() === tracker.today.getFullYear() &&
+    tracker.calendarMonth.getMonth() === tracker.today.getMonth();
 
   function openDay(event: MouseEvent<HTMLElement>, date: string) {
     setAnchorEl(event.currentTarget);
@@ -621,9 +630,77 @@ function CalendarView({
     setSelectedDate(null);
   }
 
+  function navigateCalendar(monthDelta: number) {
+    closeDay();
+    tracker.moveCalendarMonth(monthDelta);
+  }
+
+  function resetCalendar() {
+    closeDay();
+    tracker.resetCalendarMonth();
+  }
+
   return (
     <Stack spacing={2}>
-      <SectionTitle title="Calendário" subtitle={formatMonthPtBr(tracker.today)} />
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        sx={{
+          alignItems: { xs: "stretch", sm: "center" },
+          justifyContent: "space-between",
+          gap: 1.5,
+        }}
+      >
+        <SectionTitle title="Calendário" subtitle={formatMonthPtBr(tracker.calendarMonth)} />
+        <Stack
+          direction="row"
+          sx={{
+            alignItems: "center",
+            justifyContent: { xs: "space-between", sm: "flex-end" },
+            gap: 0.75,
+          }}
+        >
+          <CalendarNavButton
+            label="Ano anterior"
+            onClick={() => navigateCalendar(-12)}
+            icon={<KeyboardDoubleArrowLeftRoundedIcon fontSize="small" />}
+          />
+          <CalendarNavButton
+            label="Mês anterior"
+            onClick={() => navigateCalendar(-1)}
+            icon={<ChevronLeftRoundedIcon fontSize="small" />}
+          />
+          <Tooltip title="Voltar para o mês atual">
+            <span>
+              <Button
+                size="small"
+                variant="outlined"
+                color="secondary"
+                disabled={isCurrentMonth}
+                startIcon={<TodayRoundedIcon />}
+                onClick={resetCalendar}
+                sx={{
+                  borderRadius: "8px",
+                  minWidth: 0,
+                  px: 1.4,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Hoje
+              </Button>
+            </span>
+          </Tooltip>
+          <CalendarNavButton
+            label="Próximo mês"
+            onClick={() => navigateCalendar(1)}
+            icon={<ChevronRightRoundedIcon fontSize="small" />}
+          />
+          <CalendarNavButton
+            label="Próximo ano"
+            onClick={() => navigateCalendar(12)}
+            icon={<KeyboardDoubleArrowRightRoundedIcon fontSize="small" />}
+          />
+        </Stack>
+      </Stack>
       <Card>
         <CardContent>
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1 }}>
@@ -892,6 +969,40 @@ function DayPopoverContent({
   );
 }
 
+function CalendarNavButton({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip title={label}>
+      <IconButton
+        aria-label={label}
+        onClick={onClick}
+        size="small"
+        sx={{
+          width: 36,
+          height: 36,
+          borderRadius: "8px",
+          border: `1px solid ${nanaColors.line}`,
+          bgcolor: "#ffffff",
+          color: "text.secondary",
+          "&:hover": {
+            bgcolor: nanaColors.cream,
+            color: "primary.main",
+          },
+        }}
+      >
+        {icon}
+      </IconButton>
+    </Tooltip>
+  );
+}
+
 function PopoverMetric({
   label,
   value,
@@ -1084,18 +1195,22 @@ function RecordMiniList({
               </Typography>
             )}
           </Box>
-          <IconButton
-            aria-label="Editar registro"
+          <Button
+            aria-label={`Editar ${record.label}`}
             color="primary"
             size="small"
             onClick={record.onEdit}
+            startIcon={<EditRoundedIcon fontSize="small" />}
             sx={{
+              borderRadius: "8px",
               bgcolor: nanaColors.orangeSoft,
+              minWidth: 0,
+              px: 1.1,
               "&:hover": { bgcolor: "#ffe0b2" },
             }}
           >
-            <EditRoundedIcon fontSize="small" />
-          </IconButton>
+            Editar
+          </Button>
         </Box>
       ))}
     </Stack>

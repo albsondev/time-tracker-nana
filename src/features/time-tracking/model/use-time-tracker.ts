@@ -105,6 +105,12 @@ export function useTimeTracker(params: {
   const [state, setState] = useState<LoadingState>("idle");
   const [error, setError] = useState<string | null>(null);
   const today = useMemo(() => new Date(), []);
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const initialMonth = new Date();
+    initialMonth.setDate(1);
+    initialMonth.setHours(12, 0, 0, 0);
+    return initialMonth;
+  });
   const todayKey = toDateKey(today);
 
   const reload = useCallback(async () => {
@@ -160,6 +166,10 @@ export function useTimeTracker(params: {
   );
 
   const monthDays = useMemo(() => getMonthDays(today), [today]);
+  const calendarMonthDays = useMemo(
+    () => getMonthDays(calendarMonth),
+    [calendarMonth],
+  );
   const weekDays = useMemo(() => getWeekDays(today), [today]);
 
   const dailySummaries = useMemo(
@@ -180,6 +190,19 @@ export function useTimeTracker(params: {
     [dailySummaries, weekDays],
   );
 
+  const calendarDailySummaries = useMemo(
+    () =>
+      calendarMonthDays.map((date) =>
+        summarizeDay({
+          date,
+          entries: getEntriesForDate(entries, date),
+          breaks: getBreaksForDate(breaks, date),
+          now: today,
+        }),
+      ),
+    [breaks, calendarMonthDays, entries, today],
+  );
+
   const hasTodayEntries = todayEntries.length > 0;
   const hasWeekEntries = weekDailySummaries.some((summary) => summary.entries.length > 0);
   const hasHourBankMovements = movements.length > 0;
@@ -193,7 +216,7 @@ export function useTimeTracker(params: {
 
   const calendarDays = useMemo(
     () =>
-      dailySummaries.map((summary) => ({
+      calendarDailySummaries.map((summary) => ({
         date: summary.date,
         day: Number(summary.date.slice(8, 10)),
         status: getCalendarStatus(summary, todayKey),
@@ -203,8 +226,24 @@ export function useTimeTracker(params: {
         breaks: summary.breaks,
         dayStatus: summary.status,
       })),
-    [dailySummaries, todayKey],
+    [calendarDailySummaries, todayKey],
   );
+
+  function moveCalendarMonth(monthDelta: number) {
+    setCalendarMonth((current) => {
+      const nextMonth = new Date(current);
+      nextMonth.setMonth(current.getMonth() + monthDelta, 1);
+      nextMonth.setHours(12, 0, 0, 0);
+      return nextMonth;
+    });
+  }
+
+  function resetCalendarMonth() {
+    const currentMonth = new Date(today);
+    currentMonth.setDate(1);
+    currentMonth.setHours(12, 0, 0, 0);
+    setCalendarMonth(currentMonth);
+  }
 
   const hourBankBalance = useMemo(
     () => calculateHourBankBalance(movements),
@@ -308,7 +347,10 @@ export function useTimeTracker(params: {
     weekWorkedMinutes,
     weekReferenceDelta,
     dailySummaries,
+    calendarMonth,
     calendarDays,
+    moveCalendarMonth,
+    resetCalendarMonth,
     hourBankBalance,
     nextEntryType: inferNextAction(todayEntries, todayBreaks),
     state,
