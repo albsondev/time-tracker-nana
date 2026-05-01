@@ -725,6 +725,8 @@ function CalendarView({
                 key={day.date}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.96 }}
                 transition={{ delay: index * 0.012 }}
                 onClick={(event) => openDay(event, day.date)}
                 sx={{
@@ -826,8 +828,9 @@ function DayPopoverContent({
     day.status === "empty"
       ? nanaColors.muted
       : day.status === "negative" || day.status === "pending"
-        ? "#b45309"
-        : nanaColors.green;
+        ? "#d97706"
+        : "#2563eb";
+  const recordCount = day.entries.length + day.breaks.length;
 
   function edit(target: EditTarget) {
     onEdit(target);
@@ -835,7 +838,18 @@ function DayPopoverContent({
   }
 
   return (
-    <Box sx={{ bgcolor: "#ffffff" }}>
+    <Box
+      component={motion.div}
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.22 }}
+      sx={{
+        bgcolor: "#ffffff",
+        maxHeight: "min(620px, calc(100vh - 48px))",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <Box
         sx={{
           px: 2,
@@ -868,17 +882,39 @@ function DayPopoverContent({
         </Stack>
       </Box>
 
-      <Stack spacing={1.6} sx={{ p: 2 }}>
-        <Box
-          sx={{
-            border: `2px solid ${nanaColors.orange}`,
-            borderRadius: "10px",
-            p: 1.25,
-            bgcolor: "#fffdf9",
-            boxShadow: "0 8px 20px rgba(245, 124, 0, 0.08)",
-          }}
-        >
-          <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+          px: 2,
+          py: 2,
+          scrollbarColor: "#cbd5e1 transparent",
+          "&::-webkit-scrollbar": { width: 8 },
+          "&::-webkit-scrollbar-thumb": {
+            bgcolor: "#cbd5e1",
+            borderRadius: 999,
+          },
+          "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+        }}
+      >
+        <Stack spacing={1.6}>
+          <Box
+            component={motion.div}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -2, boxShadow: "0 12px 28px rgba(37, 99, 235, 0.16)" }}
+            transition={{ duration: 0.22 }}
+            sx={{
+              border: "2px solid #2563eb",
+              borderRadius: "10px",
+              p: 1.25,
+              bgcolor: "#f8fbff",
+              boxShadow: "0 8px 20px rgba(37, 99, 235, 0.08)",
+            }}
+          >
+            <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
           <Box
             sx={{
               width: 54,
@@ -886,8 +922,8 @@ function DayPopoverContent({
               borderRadius: "8px",
               display: "grid",
               placeItems: "center",
-              bgcolor: nanaColors.orangeSoft,
-              color: nanaColors.orange,
+              bgcolor: "#dbeafe",
+              color: "#2563eb",
               flexShrink: 0,
             }}
           >
@@ -918,67 +954,90 @@ function DayPopoverContent({
             </Typography>
           </Box>
           <Chip
-            label={hasRecords ? `${day.entries.length + day.breaks.length} itens` : "vazio"}
+            label={hasRecords ? `${recordCount} itens` : "vazio"}
             size="small"
             sx={{
               borderRadius: "6px",
-              bgcolor: hasRecords ? nanaColors.greenSoft : "#f3f0ea",
-              color: hasRecords ? nanaColors.green : nanaColors.muted,
+              bgcolor: hasRecords ? "#eef2ff" : "#f3f0ea",
+              color: hasRecords ? "#4338ca" : nanaColors.muted,
               fontWeight: 900,
             }}
           />
-          </Stack>
-        </Box>
+            </Stack>
+          </Box>
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: 1,
-          }}
-        >
-          <PopoverMetric label="Status" value={statusLabels[day.dayStatus]} color={statusColor} />
-          <PopoverMetric label="Jornada" value={minutesToHoursLabel(day.workedMinutes)} color={nanaColors.green} />
-          <PopoverMetric
-            label="Saldo"
-            value={balanceLabel}
-            color={day.balanceMinutes < 0 ? nanaColors.orange : nanaColors.green}
-          />
-        </Box>
-
-        <Box>
-          <Stack
-            direction="row"
+          <Box
             sx={{
-              alignItems: "center",
-              justifyContent: "space-between",
-              mb: 1.25,
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: 1,
             }}
           >
-            <Typography sx={{ fontWeight: 900 }}>Histórico do dia</Typography>
-            {hasRecords && (
-              <Chip
-                label={`${day.entries.length + day.breaks.length} registros`}
-                size="small"
-                sx={{
-                  bgcolor: nanaColors.greenSoft,
-                  color: nanaColors.green,
-                  height: 24,
-                }}
+            <PopoverMetric
+              color={statusColor}
+              label="Status"
+              surface="#f5f3ff"
+              value={statusLabels[day.dayStatus]}
+            />
+            <PopoverMetric
+              color="#0f766e"
+              label="Jornada"
+              surface="#f0fdfa"
+              value={minutesToHoursLabel(day.workedMinutes)}
+            />
+            <PopoverMetric
+              color={day.balanceMinutes < 0 ? "#d97706" : "#4f46e5"}
+              label="Saldo"
+              surface={day.balanceMinutes < 0 ? "#fff7ed" : "#eef2ff"}
+              value={balanceLabel}
+            />
+          </Box>
+
+          <Box>
+            <Stack
+              direction="row"
+              sx={{
+                alignItems: "center",
+                justifyContent: "space-between",
+                mb: 1.25,
+              }}
+            >
+              <Typography sx={{ fontWeight: 900 }}>Histórico do dia</Typography>
+              {hasRecords && (
+                <Chip
+                  label={`${recordCount} registros`}
+                  size="small"
+                  sx={{
+                    bgcolor: "#f1f5f9",
+                    color: "#334155",
+                    height: 24,
+                  }}
+                />
+              )}
+            </Stack>
+            {!hasRecords ? (
+              <EmptyDayState />
+            ) : (
+              <RecordMiniList
+                entries={day.entries}
+                breaks={day.breaks}
+                onEdit={edit}
               />
             )}
-          </Stack>
-          {!hasRecords ? (
-            <EmptyDayState />
-          ) : (
-            <RecordMiniList
-              entries={day.entries}
-              breaks={day.breaks}
-              onEdit={edit}
-            />
-          )}
-        </Box>
-      </Stack>
+          </Box>
+        </Stack>
+      </Box>
+      {hasRecords && recordCount > 3 && (
+        <Box
+          sx={{
+            height: 16,
+            mt: "-16px",
+            pointerEvents: "none",
+            background: "linear-gradient(180deg, rgba(255,255,255,0), #ffffff)",
+            zIndex: 1,
+          }}
+        />
+      )}
     </Box>
   );
 }
@@ -1021,23 +1080,32 @@ function PopoverMetric({
   label,
   value,
   color,
+  surface,
 }: {
   label: string;
   value: string;
   color: string;
+  surface: string;
 }) {
   return (
     <Box
+      component={motion.div}
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2 }}
+      viewport={{ once: false, amount: 0.7 }}
+      transition={{ duration: 0.2 }}
       sx={{
         minHeight: 70,
         borderRadius: "8px",
         border: `1px solid ${nanaColors.line}`,
-        bgcolor: "#fffdf9",
+        bgcolor: surface,
         px: 1.25,
         py: 1,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
+        boxShadow: "0 6px 16px rgba(36, 50, 40, 0.05)",
       }}
     >
       <Typography
@@ -1114,27 +1182,49 @@ function RecordMiniList({
   breaks: BreakEntry[];
   onEdit: (target: EditTarget) => void;
 }) {
+  const entryTones: Record<TimeEntry["type"], { accent: string; surface: string }> = {
+    arrival: { accent: "#2563eb", surface: "#dbeafe" },
+    lunch_start: { accent: "#d97706", surface: "#ffedd5" },
+    lunch_end: { accent: "#0f766e", surface: "#ccfbf1" },
+    break_start: { accent: "#7c3aed", surface: "#ede9fe" },
+    break_end: { accent: "#0891b2", surface: "#cffafe" },
+    departure: { accent: "#4f46e5", surface: "#e0e7ff" },
+  };
+  const breakTones: Record<BreakCategory, { accent: string; surface: string }> = {
+    lunch: { accent: "#d97706", surface: "#ffedd5" },
+    medical: { accent: "#dc2626", surface: "#fee2e2" },
+    sick: { accent: "#be123c", surface: "#ffe4e6" },
+    travel: { accent: "#0284c7", surface: "#e0f2fe" },
+    personal: { accent: "#7c3aed", surface: "#ede9fe" },
+    other: { accent: "#475569", surface: "#f1f5f9" },
+  };
   const records = [
-    ...entries.map((entry) => ({
-      id: `time-${entry.id}`,
-      at: entry.occurredAt,
-      time: formatTimePtBr(entry.occurredAt),
-      label: actionLabels[entry.type],
-      caption: entry.note,
-      isModified: entry.isModified,
-      tone: nanaColors.green,
-      onEdit: () => onEdit({ kind: "time", entry }),
-    })),
-    ...breaks.map((entry) => ({
-      id: `break-${entry.id}`,
-      at: entry.startsAt,
-      time: `${formatTimePtBr(entry.startsAt)}-${entry.endsAt ? formatTimePtBr(entry.endsAt) : "aberta"}`,
-      label: breakLabels[entry.category],
-      caption: entry.note,
-      isModified: entry.isModified,
-      tone: nanaColors.orange,
-      onEdit: () => onEdit({ kind: "break", entry }),
-    })),
+    ...entries.map((entry) => {
+      const tone = entryTones[entry.type];
+      return {
+        id: `time-${entry.id}`,
+        at: entry.occurredAt,
+        time: formatTimePtBr(entry.occurredAt),
+        label: actionLabels[entry.type],
+        caption: entry.note,
+        isModified: entry.isModified,
+        tone,
+        onEdit: () => onEdit({ kind: "time", entry }),
+      };
+    }),
+    ...breaks.map((entry) => {
+      const tone = breakTones[entry.category];
+      return {
+        id: `break-${entry.id}`,
+        at: entry.startsAt,
+        time: `${formatTimePtBr(entry.startsAt)}-${entry.endsAt ? formatTimePtBr(entry.endsAt) : "aberta"}`,
+        label: breakLabels[entry.category],
+        caption: entry.note,
+        isModified: entry.isModified,
+        tone,
+        onEdit: () => onEdit({ kind: "break", entry }),
+      };
+    }),
   ].sort((first, second) => first.at.localeCompare(second.at));
 
   if (records.length === 0) return null;
@@ -1143,7 +1233,13 @@ function RecordMiniList({
     <Stack spacing={1.1}>
       {records.map((record) => (
         <Box
+          component={motion.div}
           key={record.id}
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          whileHover={{ x: 3, boxShadow: "0 12px 26px rgba(36, 50, 40, 0.11)" }}
+          viewport={{ once: false, amount: 0.45 }}
+          transition={{ duration: 0.2 }}
           sx={{
             display: "grid",
             gridTemplateColumns: "auto 1fr auto",
@@ -1164,8 +1260,8 @@ function RecordMiniList({
               borderRadius: "6px",
               display: "grid",
               placeItems: "center",
-              bgcolor: `${record.tone}16`,
-              color: record.tone,
+              bgcolor: record.tone.surface,
+              color: record.tone.accent,
               fontWeight: 900,
               fontSize: "0.72rem",
               lineHeight: 1.1,
@@ -1217,10 +1313,11 @@ function RecordMiniList({
             startIcon={<EditRoundedIcon fontSize="small" />}
             sx={{
               borderRadius: "8px",
-              bgcolor: nanaColors.orangeSoft,
+              bgcolor: "#f8fafc",
+              color: record.tone.accent,
               minWidth: 0,
               px: 1.1,
-              "&:hover": { bgcolor: "#ffe0b2" },
+              "&:hover": { bgcolor: record.tone.surface },
             }}
           >
             Editar
