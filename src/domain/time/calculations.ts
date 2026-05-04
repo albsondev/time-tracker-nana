@@ -7,7 +7,7 @@ import type {
   TimeEntry,
   WeekSummary,
 } from "./types";
-import { toDateKey } from "./format";
+import { formatDateWrittenPtBr, toDateKey } from "./format";
 
 export const WEEKLY_EXPECTED_MINUTES = 30 * 60;
 export const DAILY_REFERENCE_MINUTES = 6 * 60;
@@ -191,7 +191,9 @@ export function calculateAutomaticWeeklyBankMovements(
         date: weekEndsAt,
         source: "weekly_balance" as const,
         minutesDelta,
-        description: `Crédito automático da semana ${weekStartsAt} a ${weekEndsAt}`,
+        description: `Crédito automático da semana ${formatDateWrittenPtBr(
+          weekStartsAt,
+        )} a ${formatDateWrittenPtBr(weekEndsAt)}`,
         details: sortedDays,
       });
 

@@ -45,6 +45,21 @@ export function formatDateFullPtBr(dateKey: string): string {
   }).format(new Date(`${dateKey}T12:00:00`));
 }
 
+export function formatDateWrittenPtBr(dateKey: string): string {
+  const date = new Date(`${dateKey}T12:00:00`);
+  const day = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+  }).format(date);
+  const month = new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+  }).format(date);
+  const year = new Intl.DateTimeFormat("pt-BR", {
+    year: "numeric",
+  }).format(date);
+
+  return `${day}/${month}/${year}`;
+}
+
 export function formatWeekdayLongPtBr(dateKey: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
     weekday: "long",

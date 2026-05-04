@@ -153,6 +153,9 @@ describe("time calculations", () => {
     ]);
 
     expect(movements).toHaveLength(1);
+    expect(movements[0].description).toBe(
+      "Crédito automático da semana 27/abril/2026 a 03/maio/2026",
+    );
     expect(movements[0].minutesDelta).toBe(360);
     expect(movements[0].details).toHaveLength(3);
   });
