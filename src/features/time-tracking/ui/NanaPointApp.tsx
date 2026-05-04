@@ -1,6 +1,7 @@
 "use client";
 
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
@@ -77,6 +78,10 @@ type Tab = "today" | "calendar" | "bank" | "history" | "profile";
 type EditTarget =
   | { kind: "time"; entry: TimeEntry }
   | { kind: "break"; entry: BreakEntry };
+
+type AddRecordTarget =
+  | { kind: "time"; date: string }
+  | { kind: "break"; date: string };
 
 type HistoryLimitFilter =
   | "all"
@@ -182,6 +187,7 @@ export function NanaPointApp() {
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
   const [breakDialogOpen, setBreakDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [addTarget, setAddTarget] = useState<AddRecordTarget | null>(null);
   const shouldReduceMotion = useReducedMotion();
   const supabase = hasSupabaseConfig() ? getSupabaseBrowserClient() : null;
   const tracker = useTimeTracker({
@@ -284,11 +290,21 @@ export function NanaPointApp() {
               />
             )}
             {tab === "calendar" && (
-              <CalendarView tracker={tracker} onEdit={setEditTarget} />
+              <CalendarView
+                tracker={tracker}
+                onAddBreak={(date) => setAddTarget({ kind: "break", date })}
+                onAddTime={(date) => setAddTarget({ kind: "time", date })}
+                onEdit={setEditTarget}
+              />
             )}
             {tab === "bank" && <HourBankView tracker={tracker} />}
             {tab === "history" && (
-              <HistoryView tracker={tracker} onEdit={setEditTarget} />
+              <HistoryView
+                tracker={tracker}
+                onAddBreak={(date) => setAddTarget({ kind: "break", date })}
+                onAddTime={(date) => setAddTarget({ kind: "time", date })}
+                onEdit={setEditTarget}
+              />
             )}
             {tab === "profile" && (
               <ProfileView
@@ -320,6 +336,12 @@ export function NanaPointApp() {
         onClose={() => setEditTarget(null)}
         onSubmitTime={tracker.editTimeEntry}
         onSubmitBreak={tracker.editBreak}
+      />
+      <AddRecordDialog
+        target={addTarget}
+        onClose={() => setAddTarget(null)}
+        onSubmitTime={tracker.addTimeEntry}
+        onSubmitBreak={tracker.addBreak}
       />
     </Box>
   );
@@ -660,9 +682,13 @@ function SummaryGrid({ items }: { items: [string, string, string][] }) {
 
 function CalendarView({
   tracker,
+  onAddBreak,
+  onAddTime,
   onEdit,
 }: {
   tracker: ReturnType<typeof useTimeTracker>;
+  onAddBreak: (date: string) => void;
+  onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
 }) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
@@ -848,6 +874,8 @@ function CalendarView({
         {selectedDay && (
           <DayPopoverContent
             day={selectedDay}
+            onAddBreak={onAddBreak}
+            onAddTime={onAddTime}
             onEdit={onEdit}
             onAfterEdit={closeDay}
           />
@@ -860,10 +888,14 @@ function CalendarView({
 
 function DayPopoverContent({
   day,
+  onAddBreak,
+  onAddTime,
   onEdit,
   onAfterEdit,
 }: {
   day: ReturnType<typeof useTimeTracker>["calendarDays"][number];
+  onAddBreak: (date: string) => void;
+  onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
   onAfterEdit: () => void;
 }) {
@@ -882,6 +914,16 @@ function DayPopoverContent({
 
   function edit(target: EditTarget) {
     onEdit(target);
+    onAfterEdit();
+  }
+
+  function addTime() {
+    onAddTime(day.date);
+    onAfterEdit();
+  }
+
+  function addBreak() {
+    onAddBreak(day.date);
     onAfterEdit();
   }
 
@@ -1039,6 +1081,55 @@ function DayPopoverContent({
               surface={day.balanceMinutes < 0 ? "#fff7ed" : "#eef2ff"}
               value={balanceLabel}
             />
+          </Box>
+
+          <Box
+            component={motion.div}
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.7 }}
+            transition={{ duration: 0.2 }}
+            sx={{
+              borderRadius: "10px",
+              border: `1px solid ${nanaColors.line}`,
+              bgcolor: "#f8fafc",
+              p: 1.25,
+            }}
+          >
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              sx={{ gap: 1, alignItems: { xs: "stretch", sm: "center" } }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                  Lançar nesta data
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Adicione pontos ou pausas retroativas e os totais serão recalculados.
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  onClick={addTime}
+                  size="small"
+                  startIcon={<AddRoundedIcon fontSize="small" />}
+                  sx={{ borderRadius: "8px", whiteSpace: "nowrap" }}
+                  variant="contained"
+                >
+                  Ponto
+                </Button>
+                <Button
+                  color="secondary"
+                  onClick={addBreak}
+                  size="small"
+                  startIcon={<AddRoundedIcon fontSize="small" />}
+                  sx={{ borderRadius: "8px", whiteSpace: "nowrap" }}
+                  variant="outlined"
+                >
+                  Pausa
+                </Button>
+              </Stack>
+            </Stack>
           </Box>
 
           <Box>
@@ -1430,9 +1521,13 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
 
 function HistoryView({
   tracker,
+  onAddBreak,
+  onAddTime,
   onEdit,
 }: {
   tracker: ReturnType<typeof useTimeTracker>;
+  onAddBreak: (date: string) => void;
+  onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -1441,6 +1536,7 @@ function HistoryView({
   const [limitFilter, setLimitFilter] = useState<HistoryLimitFilter>("all");
   const [entryType, setEntryType] = useState<TimeEntry["type"] | "all">("all");
   const [breakCategory, setBreakCategory] = useState<BreakCategory | "all">("all");
+  const [manualRecordDate, setManualRecordDate] = useState(tracker.todayKey);
   const [page, setPage] = useState(1);
   const [expandedHistoryDate, setExpandedHistoryDate] = useState<
     string | "none" | null
@@ -1567,9 +1663,12 @@ function HistoryView({
         entryType={entryType}
         hasActiveFilters={Boolean(hasActiveFilters)}
         limitFilter={limitFilter}
+        manualRecordDate={manualRecordDate}
         resultCount={filteredDays.length}
         search={search}
         startDate={startDate}
+        onAddBreak={onAddBreak}
+        onAddTime={onAddTime}
         onBreakCategoryChange={(value) => {
           setBreakCategory(value);
           resetPageAndExpansion();
@@ -1586,6 +1685,7 @@ function HistoryView({
           setLimitFilter(value);
           resetPageAndExpansion();
         }}
+        onManualRecordDateChange={setManualRecordDate}
         onReset={resetFilters}
         onSearchChange={(value) => {
           setSearch(value);
@@ -1669,13 +1769,17 @@ function HistoryFilters({
   entryType,
   hasActiveFilters,
   limitFilter,
+  manualRecordDate,
   resultCount,
   search,
   startDate,
+  onAddBreak,
+  onAddTime,
   onBreakCategoryChange,
   onEndDateChange,
   onEntryTypeChange,
   onLimitFilterChange,
+  onManualRecordDateChange,
   onReset,
   onSearchChange,
   onStartDateChange,
@@ -1685,13 +1789,17 @@ function HistoryFilters({
   entryType: TimeEntry["type"] | "all";
   hasActiveFilters: boolean;
   limitFilter: HistoryLimitFilter;
+  manualRecordDate: string;
   resultCount: number;
   search: string;
   startDate: string;
+  onAddBreak: (date: string) => void;
+  onAddTime: (date: string) => void;
   onBreakCategoryChange: (value: BreakCategory | "all") => void;
   onEndDateChange: (value: string) => void;
   onEntryTypeChange: (value: TimeEntry["type"] | "all") => void;
   onLimitFilterChange: (value: HistoryLimitFilter) => void;
+  onManualRecordDateChange: (value: string) => void;
   onReset: () => void;
   onSearchChange: (value: string) => void;
   onStartDateChange: (value: string) => void;
@@ -1812,6 +1920,62 @@ function HistoryFilters({
                 ))}
               </Select>
             </FormControl>
+          </Box>
+          <Box
+            component={motion.div}
+            whileHover={{ y: -2 }}
+            sx={{
+              borderRadius: "10px",
+              border: `1px solid ${nanaColors.line}`,
+              bgcolor: "#f8fafc",
+              p: 1.25,
+            }}
+          >
+            <Stack spacing={1.2}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <AddRoundedIcon color="primary" fontSize="small" />
+                <Box>
+                  <Typography sx={{ fontWeight: 900 }}>
+                    Novo registro retroativo
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Escolha uma data e lance pontos ou pausas mesmo que o dia esteja vazio.
+                  </Typography>
+                </Box>
+              </Stack>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                sx={{ gap: 1, alignItems: { xs: "stretch", sm: "center" } }}
+              >
+                <TextField
+                  label="Data do lançamento"
+                  type="date"
+                  value={manualRecordDate}
+                  onChange={(event) => onManualRecordDateChange(event.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  sx={{ flex: 1 }}
+                />
+                <Button
+                  disabled={!manualRecordDate}
+                  onClick={() => onAddTime(manualRecordDate)}
+                  startIcon={<AddRoundedIcon fontSize="small" />}
+                  sx={{ borderRadius: "8px", minHeight: 48, whiteSpace: "nowrap" }}
+                  variant="contained"
+                >
+                  Adicionar ponto
+                </Button>
+                <Button
+                  color="secondary"
+                  disabled={!manualRecordDate}
+                  onClick={() => onAddBreak(manualRecordDate)}
+                  startIcon={<AddRoundedIcon fontSize="small" />}
+                  sx={{ borderRadius: "8px", minHeight: 48, whiteSpace: "nowrap" }}
+                  variant="outlined"
+                >
+                  Adicionar pausa
+                </Button>
+              </Stack>
+            </Stack>
           </Box>
         </Stack>
       </CardContent>
@@ -2284,6 +2448,178 @@ function EditRecordFields({
         <Button onClick={onClose}>Cancelar</Button>
         <Button variant="contained" onClick={submit}>
           Salvar edição
+        </Button>
+      </DialogActions>
+    </>
+  );
+}
+
+function AddRecordDialog({
+  target,
+  onClose,
+  onSubmitTime,
+  onSubmitBreak,
+}: {
+  target: AddRecordTarget | null;
+  onClose: () => void;
+  onSubmitTime: (
+    type: TimeEntry["type"],
+    occurredAt: string,
+    note?: string,
+  ) => Promise<void>;
+  onSubmitBreak: (
+    category: BreakCategory,
+    startsAt: string,
+    endsAt: string,
+    note?: string,
+  ) => Promise<void>;
+}) {
+  const isBreak = target?.kind === "break";
+
+  return (
+    <Dialog open={Boolean(target)} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>
+        {isBreak ? "Adicionar pausa retroativa" : "Adicionar registro retroativo"}
+      </DialogTitle>
+      {target && (
+        <AddRecordFields
+          key={`${target.kind}-${target.date}`}
+          target={target}
+          onClose={onClose}
+          onSubmitTime={onSubmitTime}
+          onSubmitBreak={onSubmitBreak}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+function AddRecordFields({
+  target,
+  onClose,
+  onSubmitTime,
+  onSubmitBreak,
+}: {
+  target: AddRecordTarget;
+  onClose: () => void;
+  onSubmitTime: (
+    type: TimeEntry["type"],
+    occurredAt: string,
+    note?: string,
+  ) => Promise<void>;
+  onSubmitBreak: (
+    category: BreakCategory,
+    startsAt: string,
+    endsAt: string,
+    note?: string,
+  ) => Promise<void>;
+}) {
+  const currentTime = new Date().toTimeString().slice(0, 5);
+  const isBreak = target.kind === "break";
+  const [type, setType] = useState<TimeEntry["type"]>("arrival");
+  const [category, setCategory] = useState<BreakCategory>("lunch");
+  const [date, setDate] = useState(target.date);
+  const [time, setTime] = useState(currentTime);
+  const [endTime, setEndTime] = useState(currentTime);
+  const [note, setNote] = useState("");
+
+  function submit() {
+    if (!date || !time) return;
+
+    if (target.kind === "time") {
+      void onSubmitTime(type, toEditableIso(date, time), note || undefined).then(
+        onClose,
+      );
+      return;
+    }
+
+    if (!endTime) return;
+
+    void onSubmitBreak(
+      category,
+      toEditableIso(date, time),
+      toEditableIso(date, endTime),
+      note || undefined,
+    ).then(onClose);
+  }
+
+  return (
+    <>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {isBreak ? (
+            <FormControl fullWidth>
+              <InputLabel>Tipo de pausa</InputLabel>
+              <Select
+                label="Tipo de pausa"
+                value={category}
+                onChange={(event) => setCategory(event.target.value as BreakCategory)}
+              >
+                {Object.entries(breakLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : (
+            <FormControl fullWidth>
+              <InputLabel>Tipo de registro</InputLabel>
+              <Select
+                label="Tipo de registro"
+                value={type}
+                onChange={(event) => setType(event.target.value as TimeEntry["type"])}
+              >
+                {Object.entries(actionLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+          <TextField
+            label="Data"
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            fullWidth
+          />
+          <TextField
+            label={isBreak ? "Horário inicial" : "Horário"}
+            type="time"
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            fullWidth
+          />
+          {isBreak && (
+            <TextField
+              label="Horário final"
+              type="time"
+              value={endTime}
+              onChange={(event) => setEndTime(event.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              fullWidth
+            />
+          )}
+          <TextField
+            label="Observação opcional"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            fullWidth
+          />
+          <Alert severity="info">
+            O lançamento será salvo no Supabase e os totais do dia, mês,
+            histórico e calendário serão recalculados após salvar.
+          </Alert>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" onClick={submit}>
+          Salvar registro
         </Button>
       </DialogActions>
     </>
