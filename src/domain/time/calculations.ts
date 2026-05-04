@@ -8,6 +8,7 @@ import type {
   WeekSummary,
 } from "./types";
 import { formatDateWrittenPtBr, toDateKey } from "./format";
+import { getNationalHoliday } from "./holidays";
 
 export const WEEKLY_EXPECTED_MINUTES = 30 * 60;
 export const DAILY_REFERENCE_MINUTES = 6 * 60;
@@ -43,6 +44,24 @@ function getWeekEndKey(weekStartsAt: string) {
   weekEnd.setDate(weekEnd.getDate() + 6);
 
   return toDateKey(weekEnd);
+}
+
+function getWeekdayKeys(weekStartsAt: string) {
+  const weekStart = new Date(`${weekStartsAt}T12:00:00`);
+
+  return Array.from({ length: 5 }, (_, index) => {
+    const day = new Date(weekStart);
+    day.setDate(weekStart.getDate() + index);
+    return toDateKey(day);
+  });
+}
+
+function createEmptyDaySummary(date: string): DailySummary {
+  return summarizeDay({
+    date,
+    entries: [],
+    mark: getNationalHoliday(date),
+  });
 }
 
 export function calculateBreakMinutes(breaks: BreakEntry[]): number {
@@ -161,9 +180,9 @@ export function calculateHourBankBalance(
 export function calculateAutomaticWeeklyBankMovements(
   days: DailySummary[],
   expectedMinutes = WEEKLY_EXPECTED_MINUTES,
+  now: Date = new Date(),
 ): HourBankMovement[] {
-  const closedDays = days.filter((day) => day.status === "closed");
-  const groupedDays = closedDays.reduce<Record<string, DailySummary[]>>(
+  const groupedDays = days.reduce<Record<string, DailySummary[]>>(
     (groups, day) => {
       const weekStartsAt = getWeekStartKey(day.date);
       groups[weekStartsAt] = [...(groups[weekStartsAt] ?? []), day];
@@ -177,24 +196,51 @@ export function calculateAutomaticWeeklyBankMovements(
       const sortedDays = [...weekDays].sort((first, second) =>
         first.date.localeCompare(second.date),
       );
-      const workedMinutes = sortedDays.reduce(
+      const hasWorkRecords = sortedDays.some(
+        (day) => day.entries.length > 0 || day.breaks.length > 0,
+      );
+      const hasPendingRecords = sortedDays.some(
+        (day) =>
+          (day.entries.length > 0 || day.breaks.length > 0) &&
+          day.status !== "closed",
+      );
+      const weekEndsAt = getWeekEndKey(weekStartsAt);
+      const todayKey = toDateKey(now);
+
+      if (!hasWorkRecords || hasPendingRecords || weekEndsAt >= todayKey) {
+        return weeklyMovements;
+      }
+
+      const weekDetails = getWeekdayKeys(weekStartsAt).map(
+        (date) =>
+          sortedDays.find((day) => day.date === date) ??
+          createEmptyDaySummary(date),
+      );
+      const workedMinutes = weekDetails.reduce(
         (total, day) => total + day.workedMinutes,
         0,
       );
-      const minutesDelta = workedMinutes - expectedMinutes;
-      const weekEndsAt = getWeekEndKey(weekStartsAt);
+      const weeklyExpectedMinutes = Math.min(
+        expectedMinutes,
+        weekDetails.reduce(
+          (total, day) =>
+            total + (day.mark?.type === "holiday" ? 0 : DAILY_REFERENCE_MINUTES),
+          0,
+        ),
+      );
+      const minutesDelta = workedMinutes - weeklyExpectedMinutes;
 
-      if (minutesDelta <= 0) return weeklyMovements;
+      if (minutesDelta === 0) return weeklyMovements;
 
       weeklyMovements.push({
         id: `weekly-balance-${weekStartsAt}`,
         date: weekEndsAt,
         source: "weekly_balance" as const,
         minutesDelta,
-        description: `Crédito automático da semana ${formatDateWrittenPtBr(
+        description: `${minutesDelta > 0 ? "Crédito" : "Débito"} automático da semana ${formatDateWrittenPtBr(
           weekStartsAt,
         )} a ${formatDateWrittenPtBr(weekEndsAt)}`,
-        details: sortedDays,
+        details: weekDetails,
       });
 
       return weeklyMovements;

@@ -120,44 +120,132 @@ describe("time calculations", () => {
 
   it("creates automatic weekly hour bank credit above 30 hours", () => {
     const closedCredit = summarizeDay({
-      date: "2026-04-28",
+      date: "2026-05-05",
       entries: [
-        entry("1", "arrival", "2026-04-28T08:00:00-03:00"),
-        entry("2", "departure", "2026-04-28T20:00:00-03:00"),
+        entry("1", "arrival", "2026-05-05T08:00:00-03:00"),
+        entry("2", "departure", "2026-05-05T20:00:00-03:00"),
       ],
     });
     const secondClosedCredit = summarizeDay({
-      date: "2026-04-29",
+      date: "2026-05-06",
       entries: [
-        entry("3", "arrival", "2026-04-29T08:00:00-03:00"),
-        entry("4", "departure", "2026-04-29T20:00:00-03:00"),
+        entry("3", "arrival", "2026-05-06T08:00:00-03:00"),
+        entry("4", "departure", "2026-05-06T20:00:00-03:00"),
       ],
     });
     const thirdClosedCredit = summarizeDay({
-      date: "2026-04-30",
+      date: "2026-05-07",
       entries: [
-        entry("5", "arrival", "2026-04-30T08:00:00-03:00"),
-        entry("6", "departure", "2026-04-30T20:00:00-03:00"),
+        entry("5", "arrival", "2026-05-07T08:00:00-03:00"),
+        entry("6", "departure", "2026-05-07T20:00:00-03:00"),
       ],
     });
-    const openDay = summarizeDay({
-      date: "2026-05-01",
-      entries: [entry("7", "arrival", "2026-05-01T08:00:00-03:00")],
-      now: new Date("2026-05-04T15:00:00-03:00"),
-    });
-    const movements = calculateAutomaticWeeklyBankMovements([
-      closedCredit,
-      secondClosedCredit,
-      thirdClosedCredit,
-      openDay,
-    ]);
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [closedCredit, secondClosedCredit, thirdClosedCredit],
+      undefined,
+      new Date("2026-05-11T15:00:00-03:00"),
+    );
 
     expect(movements).toHaveLength(1);
     expect(movements[0].description).toBe(
-      "Crédito automático da semana 27/abril/2026 a 03/maio/2026",
+      "Crédito automático da semana 04/maio/2026 a 10/maio/2026",
     );
     expect(movements[0].minutesDelta).toBe(360);
-    expect(movements[0].details).toHaveLength(3);
+    expect(movements[0].details).toHaveLength(5);
+  });
+
+  it("creates automatic weekly hour bank debit below 30 hours", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-05-04",
+          entries: [
+            entry("1", "arrival", "2026-05-04T08:00:00-03:00"),
+            entry("2", "departure", "2026-05-04T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-05",
+          entries: [
+            entry("3", "arrival", "2026-05-05T08:00:00-03:00"),
+            entry("4", "departure", "2026-05-05T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-06",
+          entries: [
+            entry("5", "arrival", "2026-05-06T08:00:00-03:00"),
+            entry("6", "departure", "2026-05-06T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-07",
+          entries: [
+            entry("7", "arrival", "2026-05-07T08:00:00-03:00"),
+            entry("8", "departure", "2026-05-07T14:00:00-03:00"),
+          ],
+        }),
+      ],
+      undefined,
+      new Date("2026-05-11T15:00:00-03:00"),
+    );
+
+    expect(movements).toHaveLength(1);
+    expect(movements[0].description).toBe(
+      "Débito automático da semana 04/maio/2026 a 10/maio/2026",
+    );
+    expect(movements[0].minutesDelta).toBe(-360);
+    expect(movements[0].details?.at(4)?.date).toBe("2026-05-08");
+    expect(movements[0].details?.at(4)?.workedMinutes).toBe(0);
+  });
+
+  it("does not create weekly debit when the missing day is a holiday", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-04-27",
+          entries: [
+            entry("1", "arrival", "2026-04-27T08:00:00-03:00"),
+            entry("2", "departure", "2026-04-27T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-04-28",
+          entries: [
+            entry("3", "arrival", "2026-04-28T08:00:00-03:00"),
+            entry("4", "departure", "2026-04-28T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-04-29",
+          entries: [
+            entry("5", "arrival", "2026-04-29T08:00:00-03:00"),
+            entry("6", "departure", "2026-04-29T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-04-30",
+          entries: [
+            entry("7", "arrival", "2026-04-30T08:00:00-03:00"),
+            entry("8", "departure", "2026-04-30T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-01",
+          entries: [],
+          mark: {
+            id: "holiday-1",
+            userId,
+            date: "2026-05-01",
+            type: "holiday",
+          },
+        }),
+      ],
+      undefined,
+      new Date("2026-05-04T15:00:00-03:00"),
+    );
+
+    expect(movements).toHaveLength(0);
   });
 
   it("accumulates the hour bank movement balance", () => {

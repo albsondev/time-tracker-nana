@@ -10,6 +10,7 @@ import {
   WEEKLY_EXPECTED_MINUTES,
 } from "@/domain/time/calculations";
 import { toDateKey } from "@/domain/time/format";
+import { getNationalHoliday } from "@/domain/time/holidays";
 import type {
   BreakCategory,
   BreakEntry,
@@ -67,7 +68,7 @@ function getBreaksForDate(breaks: BreakEntry[], date: string) {
 }
 
 function getMarkForDate(marks: DayMark[], date: string) {
-  return marks.find((mark) => mark.date === date);
+  return marks.find((mark) => mark.date === date) ?? getNationalHoliday(date);
 }
 
 function summarizeDates(params: {
@@ -305,8 +306,8 @@ export function useTimeTracker(params: {
   }
 
   const automaticHourBankMovements = useMemo(
-    () => calculateAutomaticWeeklyBankMovements(historySummaries),
-    [historySummaries],
+    () => calculateAutomaticWeeklyBankMovements(historySummaries, undefined, today),
+    [historySummaries, today],
   );
 
   const hourBankMovements = useMemo(

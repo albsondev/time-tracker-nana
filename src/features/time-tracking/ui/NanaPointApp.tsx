@@ -802,79 +802,87 @@ function CalendarView({
         <CardContent>
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1 }}>
             {tracker.calendarDays.map((day, index) => (
-              <Box
-                component={motion.button}
-                type="button"
+              <Tooltip
+                arrow
+                disableHoverListener={
+                  !day.mark && day.entries.length === 0 && day.breaks.length === 0
+                }
                 key={day.date}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.96 }}
-                transition={{ delay: index * 0.012 }}
-                onClick={(event) => openDay(event, day.date)}
-                sx={{
-                  aspectRatio: "1",
-                  minHeight: 54,
-                  borderRadius: "12px",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 0.3,
-                  bgcolor:
-                    day.status === "holiday"
-                      ? "#f5f3ff"
-                      : day.status === "empty"
-                        ? "#fffaf3"
-                        : "#ffffff",
-                  border: `2px solid ${colors[day.status]}`,
-                  color: day.status === "empty" ? "text.secondary" : "text.primary",
-                  position: "relative",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  font: "inherit",
-                  p: 0.5,
-                  boxShadow:
-                    day.status === "empty"
-                      ? "inset 0 0 0 1px rgba(36, 50, 40, 0.03)"
-                      : "0 7px 18px rgba(64, 42, 12, 0.08)",
-                  "&:hover": {
-                    bgcolor: "#ffffff",
-                    boxShadow: "0 12px 28px rgba(64, 42, 12, 0.16)",
-                    transform: "translateY(-1px)",
-                  },
-                }}
+                title={<CalendarDayTooltip day={day} />}
               >
-                <Typography variant="caption" sx={{ fontWeight: 900, lineHeight: 1 }}>
-                  {formatWeekdayShortPtBr(day.date)}
-                </Typography>
-                <Typography sx={{ fontWeight: 900, lineHeight: 1 }}>
-                  {day.day}
-                </Typography>
-                {day.mark?.type === "holiday" && (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: "#6d28d9",
-                      fontSize: "0.56rem",
-                      fontWeight: 900,
-                      lineHeight: 1,
-                    }}
-                  >
-                    FER
-                  </Typography>
-                )}
                 <Box
+                  component={motion.button}
+                  type="button"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.96 }}
+                  transition={{ delay: index * 0.012 }}
+                  onClick={(event) => openDay(event, day.date)}
                   sx={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    bgcolor: colors[day.status],
-                    position: "absolute",
-                    bottom: 7,
+                    aspectRatio: "1",
+                    minHeight: 54,
+                    borderRadius: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 0.3,
+                    bgcolor:
+                      day.status === "holiday"
+                        ? "#f5f3ff"
+                        : day.status === "empty"
+                          ? "#fffaf3"
+                          : "#ffffff",
+                    border: `2px solid ${colors[day.status]}`,
+                    color: day.status === "empty" ? "text.secondary" : "text.primary",
+                    position: "relative",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    font: "inherit",
+                    p: 0.5,
+                    boxShadow:
+                      day.status === "empty"
+                        ? "inset 0 0 0 1px rgba(36, 50, 40, 0.03)"
+                        : "0 7px 18px rgba(64, 42, 12, 0.08)",
+                    "&:hover": {
+                      bgcolor: "#ffffff",
+                      boxShadow: "0 12px 28px rgba(64, 42, 12, 0.16)",
+                      transform: "translateY(-1px)",
+                    },
                   }}
-                />
-              </Box>
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 900, lineHeight: 1 }}>
+                    {formatWeekdayShortPtBr(day.date)}
+                  </Typography>
+                  <Typography sx={{ fontWeight: 900, lineHeight: 1 }}>
+                    {day.day}
+                  </Typography>
+                  {day.mark?.type === "holiday" && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#6d28d9",
+                        fontSize: "0.56rem",
+                        fontWeight: 900,
+                        lineHeight: 1,
+                      }}
+                    >
+                      FER
+                    </Typography>
+                  )}
+                  <Box
+                    sx={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      bgcolor: colors[day.status],
+                      position: "absolute",
+                      bottom: 7,
+                    }}
+                  />
+                </Box>
+              </Tooltip>
             ))}
           </Box>
         </CardContent>
@@ -911,6 +919,42 @@ function CalendarView({
       </Popover>
       <Legend />
     </Stack>
+  );
+}
+
+function CalendarDayTooltip({
+  day,
+}: {
+  day: ReturnType<typeof useTimeTracker>["calendarDays"][number];
+}) {
+  const firstEntry = [...day.entries].sort((first, second) =>
+    first.occurredAt.localeCompare(second.occurredAt),
+  )[0];
+  const lastEntry = [...day.entries].sort((first, second) =>
+    second.occurredAt.localeCompare(first.occurredAt),
+  )[0];
+
+  return (
+    <Box sx={{ maxWidth: 240, py: 0.3 }}>
+      <Typography sx={{ fontWeight: 900, fontSize: "0.82rem" }}>
+        {formatDateFullPtBr(day.date)}
+      </Typography>
+      {day.mark?.type === "holiday" && (
+        <Typography sx={{ color: "#ddd6fe", fontWeight: 800, fontSize: "0.78rem" }}>
+          Feriado: {day.mark.note ?? "marcado"}
+        </Typography>
+      )}
+      {(day.entries.length > 0 || day.breaks.length > 0) && (
+        <Typography sx={{ fontSize: "0.78rem", mt: 0.35 }}>
+          {minutesToHoursLabel(day.workedMinutes)} registrados
+          {firstEntry ? ` · entrada ${formatTimePtBr(firstEntry.occurredAt)}` : ""}
+          {lastEntry && lastEntry.id !== firstEntry?.id
+            ? ` · último ${formatTimePtBr(lastEntry.occurredAt)}`
+            : ""}
+          {day.breaks.length > 0 ? ` · ${day.breaks.length} pausas` : ""}
+        </Typography>
+      )}
+    </Box>
   );
 }
 
@@ -1560,7 +1604,7 @@ function RecordMiniList({
 function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }) {
   return (
     <Stack spacing={2}>
-      <SectionTitle title="Banco de horas" subtitle="Créditos acima de 30h semanais" />
+      <SectionTitle title="Banco de horas" subtitle="Créditos e débitos semanais" />
       {tracker.hasHourBankMovements ? (
         <Card>
         <CardContent sx={{ p: 3 }}>
@@ -1576,13 +1620,13 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
             {minutesToHoursLabel(tracker.hourBankBalance)}
           </Typography>
           <Typography color="text.secondary">
-            Soma créditos automáticos de semanas acima de 30h e ajustes salvos.
+            Soma créditos e débitos automáticos contra o limite de 30h semanais.
           </Typography>
         </CardContent>
         </Card>
       ) : (
         <Alert severity="info">
-          Nenhum crédito de banco de horas foi gerado ainda.
+          Nenhum movimento de banco de horas foi gerado ainda.
         </Alert>
       )}
       <Stack spacing={1.5}>
@@ -1665,6 +1709,14 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
 }
 
 function getHourBankDetailLabel(day: DailySummary) {
+  if (day.mark?.type === "holiday" && day.entries.length === 0 && day.breaks.length === 0) {
+    return "Feriado";
+  }
+
+  if (day.entries.length === 0 && day.breaks.length === 0) {
+    return "Sem registros";
+  }
+
   const entryLabels = [...day.entries]
     .sort((first, second) => first.occurredAt.localeCompare(second.occurredAt))
     .map((entry) => `${actionLabels[entry.type]} ${formatTimePtBr(entry.occurredAt)}`);
