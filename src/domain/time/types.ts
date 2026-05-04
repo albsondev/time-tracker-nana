@@ -78,4 +78,5 @@ export type HourBankMovement = {
   source: "weekly_balance" | "manual_adjustment" | "compensation";
   minutesDelta: number;
   description: string;
+  details?: DailySummary[];
 };

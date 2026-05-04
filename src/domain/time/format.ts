@@ -37,6 +37,14 @@ export function formatDatePtBr(dateKey: string): string {
   }).format(new Date(`${dateKey}T12:00:00`));
 }
 
+export function formatDateFullPtBr(dateKey: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(`${dateKey}T12:00:00`));
+}
+
 export function formatWeekdayLongPtBr(dateKey: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
     weekday: "long",

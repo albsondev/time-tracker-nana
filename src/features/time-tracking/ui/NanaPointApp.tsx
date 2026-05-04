@@ -53,6 +53,7 @@ import type { MouseEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import {
   formatDatePtBr,
+  formatDateFullPtBr,
   formatMonthPtBr,
   formatTimePtBr,
   formatWeekdayLongPtBr,
@@ -1470,7 +1471,7 @@ function RecordMiniList({
 function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }) {
   return (
     <Stack spacing={2}>
-      <SectionTitle title="Banco de horas" subtitle="Créditos, débitos e compensações" />
+      <SectionTitle title="Banco de horas" subtitle="Créditos acima de 30h semanais" />
       {tracker.hasHourBankMovements ? (
         <Card>
         <CardContent sx={{ p: 3 }}>
@@ -1486,30 +1487,85 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
             {minutesToHoursLabel(tracker.hourBankBalance)}
           </Typography>
           <Typography color="text.secondary">
-            Calculado somente a partir dos movimentos salvos no banco.
+            Soma créditos automáticos de semanas acima de 30h e ajustes salvos.
           </Typography>
         </CardContent>
         </Card>
       ) : (
         <Alert severity="info">
-          Nenhum movimento de banco de horas foi lançado ainda.
+          Nenhum crédito de banco de horas foi gerado ainda.
         </Alert>
       )}
       <Stack spacing={1.5}>
         {tracker.movements.map((movement) => (
           <Card key={movement.id}>
             <CardContent>
-              <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
-                <Box>
-                  <Typography sx={{ fontWeight: 800 }}>{movement.description}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {formatDatePtBr(movement.date)}
-                  </Typography>
-                </Box>
-                <Chip
-                  label={minutesToHoursLabel(movement.minutesDelta)}
-                  color={movement.minutesDelta >= 0 ? "secondary" : "warning"}
-                />
+              <Stack spacing={1.4}>
+                <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
+                  <Box>
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      sx={{ alignItems: "center", flexWrap: "wrap" }}
+                    >
+                      <Typography sx={{ fontWeight: 800 }}>{movement.description}</Typography>
+                      {movement.source === "weekly_balance" && (
+                        <Chip
+                          label="automático"
+                          size="small"
+                          sx={{
+                            borderRadius: "6px",
+                            bgcolor: "#eef2ff",
+                            color: "#4338ca",
+                          }}
+                        />
+                      )}
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      {formatDateFullPtBr(movement.date)}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    label={minutesToHoursLabel(movement.minutesDelta)}
+                    color={movement.minutesDelta >= 0 ? "secondary" : "warning"}
+                    sx={{ borderRadius: "8px" }}
+                  />
+                </Stack>
+                {movement.details && movement.details.length > 0 && (
+                  <Stack spacing={0.8}>
+                    {movement.details.map((day) => (
+                      <Box
+                        key={`${movement.id}-${day.date}`}
+                        sx={{
+                          border: `1px solid ${nanaColors.line}`,
+                          borderRadius: "8px",
+                          bgcolor: "#f8fafc",
+                          px: 1,
+                          py: 0.85,
+                        }}
+                      >
+                        <Stack
+                          direction="row"
+                          sx={{ justifyContent: "space-between", gap: 1.5 }}
+                        >
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography sx={{ fontWeight: 900 }}>
+                              {formatDateFullPtBr(day.date)}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {getHourBankDetailLabel(day)}
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={minutesToHoursLabel(day.workedMinutes)}
+                            size="small"
+                            sx={{ borderRadius: "6px", flexShrink: 0 }}
+                          />
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
               </Stack>
             </CardContent>
           </Card>
@@ -1517,6 +1573,20 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
       </Stack>
     </Stack>
   );
+}
+
+function getHourBankDetailLabel(day: DailySummary) {
+  const entryLabels = [...day.entries]
+    .sort((first, second) => first.occurredAt.localeCompare(second.occurredAt))
+    .map((entry) => `${actionLabels[entry.type]} ${formatTimePtBr(entry.occurredAt)}`);
+  const breakLabelsForDay = [...day.breaks]
+    .sort((first, second) => first.startsAt.localeCompare(second.startsAt))
+    .map((entry) => {
+      const end = entry.endsAt ? formatTimePtBr(entry.endsAt) : "aberta";
+      return `${breakLabels[entry.category]} ${formatTimePtBr(entry.startsAt)}-${end}`;
+    });
+
+  return [...entryLabels, ...breakLabelsForDay].join(" · ");
 }
 
 function HistoryView({

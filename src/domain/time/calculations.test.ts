@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateAutomaticWeeklyBankMovements,
   calculateHourBankBalance,
   calculateWorkedMinutes,
   getNextEntryType,
@@ -88,6 +89,56 @@ describe("time calculations", () => {
     expect(week.expectedMinutes).toBe(WEEKLY_EXPECTED_MINUTES);
     expect(week.workedMinutes).toBe(1890);
     expect(week.balanceMinutes).toBe(90);
+  });
+
+  it("does not keep counting an old day without departure until now", () => {
+    const summary = summarizeDay({
+      date: "2026-04-28",
+      entries: [entry("1", "arrival", "2026-04-28T08:00:00-03:00")],
+      now: new Date("2026-05-04T15:00:00-03:00"),
+    });
+
+    expect(summary.status).toBe("working");
+    expect(summary.workedMinutes).toBe(0);
+  });
+
+  it("creates automatic weekly hour bank credit above 30 hours", () => {
+    const closedCredit = summarizeDay({
+      date: "2026-04-28",
+      entries: [
+        entry("1", "arrival", "2026-04-28T08:00:00-03:00"),
+        entry("2", "departure", "2026-04-28T20:00:00-03:00"),
+      ],
+    });
+    const secondClosedCredit = summarizeDay({
+      date: "2026-04-29",
+      entries: [
+        entry("3", "arrival", "2026-04-29T08:00:00-03:00"),
+        entry("4", "departure", "2026-04-29T20:00:00-03:00"),
+      ],
+    });
+    const thirdClosedCredit = summarizeDay({
+      date: "2026-04-30",
+      entries: [
+        entry("5", "arrival", "2026-04-30T08:00:00-03:00"),
+        entry("6", "departure", "2026-04-30T20:00:00-03:00"),
+      ],
+    });
+    const openDay = summarizeDay({
+      date: "2026-05-01",
+      entries: [entry("7", "arrival", "2026-05-01T08:00:00-03:00")],
+      now: new Date("2026-05-04T15:00:00-03:00"),
+    });
+    const movements = calculateAutomaticWeeklyBankMovements([
+      closedCredit,
+      secondClosedCredit,
+      thirdClosedCredit,
+      openDay,
+    ]);
+
+    expect(movements).toHaveLength(1);
+    expect(movements[0].minutesDelta).toBe(360);
+    expect(movements[0].details).toHaveLength(3);
   });
 
   it("accumulates the hour bank movement balance", () => {

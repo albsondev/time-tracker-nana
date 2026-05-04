@@ -2,9 +2,11 @@ import type {
   BreakEntry,
   DailySummary,
   DayStatus,
+  HourBankMovement,
   TimeEntry,
   WeekSummary,
 } from "./types";
+import { toDateKey } from "./format";
 
 export const WEEKLY_EXPECTED_MINUTES = 30 * 60;
 export const DAILY_REFERENCE_MINUTES = 6 * 60;
@@ -24,6 +26,22 @@ function findEntry(entries: TimeEntry[], type: TimeEntry["type"]) {
   return entries
     .filter((entry) => entry.type === type)
     .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))[0];
+}
+
+function getWeekStartKey(dateKey: string) {
+  const current = new Date(`${dateKey}T12:00:00`);
+  const day = current.getDay();
+  const distanceFromMonday = day === 0 ? 6 : day - 1;
+  current.setDate(current.getDate() - distanceFromMonday);
+
+  return toDateKey(current);
+}
+
+function getWeekEndKey(weekStartsAt: string) {
+  const weekEnd = new Date(`${weekStartsAt}T12:00:00`);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+
+  return toDateKey(weekEnd);
 }
 
 export function calculateBreakMinutes(breaks: BreakEntry[]): number {
@@ -84,10 +102,13 @@ export function summarizeDay(params: {
   now?: Date;
 }): DailySummary {
   const breaks = params.breaks ?? [];
+  const now = params.now ?? new Date();
+  const effectiveNow =
+    params.date === toDateKey(now) ? now : new Date(`${params.date}T00:00:00`);
   const workedMinutes = calculateWorkedMinutes(
     params.entries,
     breaks,
-    params.now,
+    effectiveNow,
   );
   const expectedMinutes = params.expectedMinutes ?? DAILY_REFERENCE_MINUTES;
 
@@ -130,6 +151,48 @@ export function calculateHourBankBalance(
   movements: { minutesDelta: number }[],
 ): number {
   return movements.reduce((total, movement) => total + movement.minutesDelta, 0);
+}
+
+export function calculateAutomaticWeeklyBankMovements(
+  days: DailySummary[],
+  expectedMinutes = WEEKLY_EXPECTED_MINUTES,
+): HourBankMovement[] {
+  const closedDays = days.filter((day) => day.status === "closed");
+  const groupedDays = closedDays.reduce<Record<string, DailySummary[]>>(
+    (groups, day) => {
+      const weekStartsAt = getWeekStartKey(day.date);
+      groups[weekStartsAt] = [...(groups[weekStartsAt] ?? []), day];
+      return groups;
+    },
+    {},
+  );
+
+  return Object.entries(groupedDays)
+    .reduce<HourBankMovement[]>((weeklyMovements, [weekStartsAt, weekDays]) => {
+      const sortedDays = [...weekDays].sort((first, second) =>
+        first.date.localeCompare(second.date),
+      );
+      const workedMinutes = sortedDays.reduce(
+        (total, day) => total + day.workedMinutes,
+        0,
+      );
+      const minutesDelta = workedMinutes - expectedMinutes;
+      const weekEndsAt = getWeekEndKey(weekStartsAt);
+
+      if (minutesDelta <= 0) return weeklyMovements;
+
+      weeklyMovements.push({
+        id: `weekly-balance-${weekStartsAt}`,
+        date: weekEndsAt,
+        source: "weekly_balance" as const,
+        minutesDelta,
+        description: `Crédito automático da semana ${weekStartsAt} a ${weekEndsAt}`,
+        details: sortedDays,
+      });
+
+      return weeklyMovements;
+    }, [])
+    .sort((first, second) => second.date.localeCompare(first.date));
 }
 
 export function getNextEntryType(

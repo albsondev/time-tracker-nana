@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  calculateAutomaticWeeklyBankMovements,
   calculateHourBankBalance,
   getNextEntryType,
   summarizeDay,
@@ -243,8 +244,6 @@ export function useTimeTracker(params: {
 
   const hasTodayEntries = todayEntries.length > 0;
   const hasWeekEntries = weekDailySummaries.some((summary) => summary.entries.length > 0);
-  const hasHourBankMovements = movements.length > 0;
-
   const weekWorkedMinutes = useMemo(
     () => weekDailySummaries.reduce((total, day) => total + day.workedMinutes, 0),
     [weekDailySummaries],
@@ -283,9 +282,25 @@ export function useTimeTracker(params: {
     setCalendarMonth(currentMonth);
   }
 
+  const automaticHourBankMovements = useMemo(
+    () => calculateAutomaticWeeklyBankMovements(historySummaries),
+    [historySummaries],
+  );
+
+  const hourBankMovements = useMemo(
+    () =>
+      [
+        ...automaticHourBankMovements,
+        ...movements.filter((movement) => movement.source !== "weekly_balance"),
+      ].sort((first, second) => second.date.localeCompare(first.date)),
+    [automaticHourBankMovements, movements],
+  );
+
+  const hasHourBankMovements = hourBankMovements.length > 0;
+
   const hourBankBalance = useMemo(
-    () => calculateHourBankBalance(movements),
-    [movements],
+    () => calculateHourBankBalance(hourBankMovements),
+    [hourBankMovements],
   );
 
   async function addTimeEntry(
@@ -377,7 +392,7 @@ export function useTimeTracker(params: {
     todayKey,
     entries,
     breaks,
-    movements,
+    movements: hourBankMovements,
     todaySummary,
     hasTodayEntries,
     hasWeekEntries,
