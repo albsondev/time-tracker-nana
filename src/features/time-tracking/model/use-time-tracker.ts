@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   calculateAutomaticWeeklyBankMovements,
   calculateHourBankBalance,
+  DAILY_REFERENCE_MINUTES,
   getNextEntryType,
   summarizeDay,
   WEEKLY_EXPECTED_MINUTES,
@@ -271,7 +272,20 @@ export function useTimeTracker(params: {
     [weekDailySummaries],
   );
 
-  const weekReferenceDelta = weekWorkedMinutes - WEEKLY_EXPECTED_MINUTES;
+  const weekExpectedMinutes = useMemo(
+    () =>
+      Math.min(
+        WEEKLY_EXPECTED_MINUTES,
+        weekDailySummaries.reduce(
+          (total, day) =>
+            total + (day.mark?.type === "holiday" ? 0 : DAILY_REFERENCE_MINUTES),
+          0,
+        ),
+      ),
+    [weekDailySummaries],
+  );
+
+  const weekReferenceDelta = weekWorkedMinutes - weekExpectedMinutes;
 
   const calendarDays = useMemo(
     () =>
@@ -448,6 +462,7 @@ export function useTimeTracker(params: {
     hasWeekEntries,
     hasHourBankMovements,
     weekWorkedMinutes,
+    weekExpectedMinutes,
     weekReferenceDelta,
     dailySummaries,
     historySummaries,

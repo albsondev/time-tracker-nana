@@ -152,7 +152,16 @@ export function summarizeWeek(params: {
   days: DailySummary[];
   expectedMinutes?: number;
 }): WeekSummary {
-  const expectedMinutes = params.expectedMinutes ?? WEEKLY_EXPECTED_MINUTES;
+  const expectedMinutes =
+    params.expectedMinutes ??
+    Math.min(
+      WEEKLY_EXPECTED_MINUTES,
+      params.days.reduce(
+        (total, day) =>
+          total + (day.mark?.type === "holiday" ? 0 : DAILY_REFERENCE_MINUTES),
+        0,
+      ),
+    );
   const workedMinutes = params.days.reduce(
     (total, day) => total + day.workedMinutes,
     0,

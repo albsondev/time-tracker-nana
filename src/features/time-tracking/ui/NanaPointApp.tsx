@@ -1689,11 +1689,24 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
                               {getHourBankDetailLabel(day)}
                             </Typography>
                           </Box>
-                          <Chip
-                            label={minutesToHoursLabel(day.workedMinutes)}
-                            size="small"
-                            sx={{ borderRadius: "6px", flexShrink: 0 }}
-                          />
+                          {day.mark?.type === "holiday" && day.workedMinutes === 0 ? (
+                            <Chip
+                              label="isento"
+                              size="small"
+                              sx={{
+                                borderRadius: "6px",
+                                flexShrink: 0,
+                                bgcolor: "#f5f3ff",
+                                color: "#6d28d9",
+                              }}
+                            />
+                          ) : (
+                            <Chip
+                              label={minutesToHoursLabel(day.workedMinutes)}
+                              size="small"
+                              sx={{ borderRadius: "6px", flexShrink: 0 }}
+                            />
+                          )}
                         </Stack>
                       </Box>
                     ))}

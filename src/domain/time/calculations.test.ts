@@ -107,6 +107,31 @@ describe("time calculations", () => {
     expect(week.balanceMinutes).toBe(90);
   });
 
+  it("reduces the weekly target when a weekday is a holiday", () => {
+    const week = summarizeWeek({
+      weekStartsAt: "2026-04-27",
+      days: [
+        { ...summarizeDay({ date: "2026-04-27", entries: [] }), workedMinutes: 360 },
+        { ...summarizeDay({ date: "2026-04-28", entries: [] }), workedMinutes: 360 },
+        { ...summarizeDay({ date: "2026-04-29", entries: [] }), workedMinutes: 360 },
+        { ...summarizeDay({ date: "2026-04-30", entries: [] }), workedMinutes: 360 },
+        summarizeDay({
+          date: "2026-05-01",
+          entries: [],
+          mark: {
+            id: "holiday-1",
+            userId,
+            date: "2026-05-01",
+            type: "holiday",
+          },
+        }),
+      ],
+    });
+
+    expect(week.expectedMinutes).toBe(24 * 60);
+    expect(week.balanceMinutes).toBe(0);
+  });
+
   it("does not keep counting an old day without departure until now", () => {
     const summary = summarizeDay({
       date: "2026-04-28",
@@ -239,6 +264,45 @@ describe("time calculations", () => {
             date: "2026-05-01",
             type: "holiday",
           },
+        }),
+      ],
+      undefined,
+      new Date("2026-05-04T15:00:00-03:00"),
+    );
+
+    expect(movements).toHaveLength(0);
+  });
+
+  it("does not create weekly debit when the missing day is a national holiday", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-04-27",
+          entries: [
+            entry("1", "arrival", "2026-04-27T08:00:00-03:00"),
+            entry("2", "departure", "2026-04-27T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-04-28",
+          entries: [
+            entry("3", "arrival", "2026-04-28T08:00:00-03:00"),
+            entry("4", "departure", "2026-04-28T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-04-29",
+          entries: [
+            entry("5", "arrival", "2026-04-29T08:00:00-03:00"),
+            entry("6", "departure", "2026-04-29T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-04-30",
+          entries: [
+            entry("7", "arrival", "2026-04-30T08:00:00-03:00"),
+            entry("8", "departure", "2026-04-30T14:00:00-03:00"),
+          ],
         }),
       ],
       undefined,
