@@ -2,6 +2,7 @@ import type {
   BreakEntry,
   DailySummary,
   DayStatus,
+  DayMark,
   HourBankMovement,
   TimeEntry,
   WeekSummary,
@@ -98,6 +99,7 @@ export function summarizeDay(params: {
   date: string;
   entries: TimeEntry[];
   breaks?: BreakEntry[];
+  mark?: DayMark;
   expectedMinutes?: number;
   now?: Date;
 }): DailySummary {
@@ -105,12 +107,14 @@ export function summarizeDay(params: {
   const now = params.now ?? new Date();
   const effectiveNow =
     params.date === toDateKey(now) ? now : new Date(`${params.date}T00:00:00`);
+  const isHoliday = params.mark?.type === "holiday";
   const workedMinutes = calculateWorkedMinutes(
     params.entries,
     breaks,
     effectiveNow,
   );
-  const expectedMinutes = params.expectedMinutes ?? DAILY_REFERENCE_MINUTES;
+  const expectedMinutes =
+    params.expectedMinutes ?? (isHoliday ? 0 : DAILY_REFERENCE_MINUTES);
 
   return {
     date: params.date,
@@ -120,6 +124,7 @@ export function summarizeDay(params: {
     balanceMinutes: workedMinutes - expectedMinutes,
     entries: params.entries,
     breaks,
+    mark: params.mark,
   };
 }
 

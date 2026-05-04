@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BreakEntry, HourBankMovement, TimeEntry } from "@/domain/time/types";
+import type {
+  BreakEntry,
+  DayMark,
+  HourBankMovement,
+  TimeEntry,
+} from "@/domain/time/types";
 
 export type UserProfile = {
   id: string;
@@ -11,6 +16,7 @@ export type UserProfile = {
 export type TimeTrackingSnapshot = {
   entries: TimeEntry[];
   breaks: BreakEntry[];
+  marks: DayMark[];
   movements: HourBankMovement[];
 };
 
@@ -32,7 +38,7 @@ export async function loadUserTimeTrackingSnapshot(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<TimeTrackingSnapshot> {
-  const [entriesResult, breaksResult, movementsResult] = await Promise.all([
+  const [entriesResult, breaksResult, marksResult, movementsResult] = await Promise.all([
     supabase
       .from("time_entries")
       .select("id,user_id,occurred_at,type,note,is_modified,modified_at")
@@ -46,6 +52,11 @@ export async function loadUserTimeTrackingSnapshot(
       .eq("user_id", userId)
       .order("starts_at", { ascending: true }),
     supabase
+      .from("day_marks")
+      .select("id,user_id,work_date,type,note")
+      .eq("user_id", userId)
+      .order("work_date", { ascending: true }),
+    supabase
       .from("hour_bank_movements")
       .select("id,movement_date,source,minutes_delta,description")
       .eq("user_id", userId)
@@ -54,6 +65,7 @@ export async function loadUserTimeTrackingSnapshot(
 
   if (entriesResult.error) throw entriesResult.error;
   if (breaksResult.error) throw breaksResult.error;
+  if (marksResult.error) throw marksResult.error;
   if (movementsResult.error) throw movementsResult.error;
 
   return {
@@ -80,6 +92,14 @@ export async function loadUserTimeTrackingSnapshot(
         isModified: entry.is_modified,
         modifiedAt: entry.modified_at ?? undefined,
       })) ?? [],
+    marks:
+      marksResult.data?.map((mark) => ({
+        id: mark.id,
+        userId: mark.user_id,
+        date: mark.work_date,
+        type: mark.type as DayMark["type"],
+        note: mark.note ?? undefined,
+      })) ?? [],
     movements:
       movementsResult.data?.map((movement) => ({
         id: movement.id,
@@ -89,6 +109,37 @@ export async function loadUserTimeTrackingSnapshot(
         description: movement.description,
       })) ?? [],
   };
+}
+
+export async function upsertDayMark(
+  supabase: SupabaseClient,
+  mark: Omit<DayMark, "id">,
+) {
+  const { error } = await supabase.from("day_marks").upsert(
+    {
+      user_id: mark.userId,
+      work_date: mark.date,
+      type: mark.type,
+      note: mark.note ?? null,
+    },
+    { onConflict: "user_id,work_date,type" },
+  );
+
+  if (error) throw error;
+}
+
+export async function deleteDayMark(
+  supabase: SupabaseClient,
+  mark: Pick<DayMark, "userId" | "date" | "type">,
+) {
+  const { error } = await supabase
+    .from("day_marks")
+    .delete()
+    .eq("user_id", mark.userId)
+    .eq("work_date", mark.date)
+    .eq("type", mark.type);
+
+  if (error) throw error;
 }
 
 export async function createTimeEntry(

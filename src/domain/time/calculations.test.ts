@@ -74,6 +74,22 @@ describe("time calculations", () => {
     expect(summary.balanceMinutes).toBe(60);
   });
 
+  it("uses zero expected minutes for a marked holiday", () => {
+    const summary = summarizeDay({
+      date: "2026-05-01",
+      entries: [],
+      mark: {
+        id: "mark-1",
+        userId,
+        date: "2026-05-01",
+        type: "holiday",
+      },
+    });
+
+    expect(summary.balanceMinutes).toBe(0);
+    expect(summary.mark?.type).toBe("holiday");
+  });
+
   it("creates weekly credit or debit based on the 30 hour target", () => {
     const week = summarizeWeek({
       weekStartsAt: "2026-04-27",

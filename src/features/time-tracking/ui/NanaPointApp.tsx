@@ -7,6 +7,7 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
@@ -90,7 +91,8 @@ type HistoryLimitFilter =
   | "negative"
   | "pending"
   | "complete"
-  | "edited";
+  | "edited"
+  | "holiday";
 
 const actionLabels: Record<TimeEntry["type"], string> = {
   arrival: "Cheguei no trabalho",
@@ -163,6 +165,8 @@ function recordMatchesSearch(
     formatDatePtBr(day.date),
     formatWeekdayLongPtBr(day.date),
     statusLabels[day.status],
+    day.mark?.type === "holiday" ? "feriado" : "",
+    day.mark?.note ?? "",
     ...day.entries.flatMap((entry) => [
       actionLabels[entry.type],
       entry.note ?? "",
@@ -296,6 +300,7 @@ export function NanaPointApp() {
                 onAddBreak={(date) => setAddTarget({ kind: "break", date })}
                 onAddTime={(date) => setAddTarget({ kind: "time", date })}
                 onEdit={setEditTarget}
+                onToggleHoliday={tracker.toggleHoliday}
               />
             )}
             {tab === "bank" && <HourBankView tracker={tracker} />}
@@ -686,11 +691,13 @@ function CalendarView({
   onAddBreak,
   onAddTime,
   onEdit,
+  onToggleHoliday,
 }: {
   tracker: ReturnType<typeof useTimeTracker>;
   onAddBreak: (date: string) => void;
   onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
+  onToggleHoliday: (date: string) => Promise<void>;
 }) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -700,6 +707,7 @@ function CalendarView({
     exceeded: "#43a047",
     negative: "#fb8c00",
     pending: "#ef6c00",
+    holiday: "#7c3aed",
     empty: "#d8d1c6",
   };
   const selectedDay =
@@ -813,7 +821,12 @@ function CalendarView({
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 0.3,
-                  bgcolor: day.status === "empty" ? "#fffaf3" : "#ffffff",
+                  bgcolor:
+                    day.status === "holiday"
+                      ? "#f5f3ff"
+                      : day.status === "empty"
+                        ? "#fffaf3"
+                        : "#ffffff",
                   border: `2px solid ${colors[day.status]}`,
                   color: day.status === "empty" ? "text.secondary" : "text.primary",
                   position: "relative",
@@ -838,6 +851,19 @@ function CalendarView({
                 <Typography sx={{ fontWeight: 900, lineHeight: 1 }}>
                   {day.day}
                 </Typography>
+                {day.mark?.type === "holiday" && (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "#6d28d9",
+                      fontSize: "0.56rem",
+                      fontWeight: 900,
+                      lineHeight: 1,
+                    }}
+                  >
+                    FER
+                  </Typography>
+                )}
                 <Box
                   sx={{
                     width: 7,
@@ -879,6 +905,7 @@ function CalendarView({
             onAddTime={onAddTime}
             onEdit={onEdit}
             onAfterEdit={closeDay}
+            onToggleHoliday={onToggleHoliday}
           />
         )}
       </Popover>
@@ -893,20 +920,25 @@ function DayPopoverContent({
   onAddTime,
   onEdit,
   onAfterEdit,
+  onToggleHoliday,
 }: {
   day: ReturnType<typeof useTimeTracker>["calendarDays"][number];
   onAddBreak: (date: string) => void;
   onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
   onAfterEdit: () => void;
+  onToggleHoliday: (date: string) => Promise<void>;
 }) {
   const hasRecords = day.entries.length > 0 || day.breaks.length > 0;
+  const isHoliday = day.mark?.type === "holiday";
   const balanceLabel =
     day.balanceMinutes === 0
       ? "0min"
       : minutesToHoursLabel(day.balanceMinutes);
   const statusColor =
-    day.status === "empty"
+    isHoliday
+      ? "#7c3aed"
+      : day.status === "empty"
       ? nanaColors.muted
       : day.status === "negative" || day.status === "pending"
         ? "#d97706"
@@ -926,6 +958,10 @@ function DayPopoverContent({
   function addBreak() {
     onAddBreak(day.date);
     onAfterEdit();
+  }
+
+  function toggleHoliday() {
+    void onToggleHoliday(day.date).then(onAfterEdit);
   }
 
   return (
@@ -956,6 +992,20 @@ function DayPopoverContent({
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
               {formatWeekdayLongPtBr(day.date)} · {formatDatePtBr(day.date)}
             </Typography>
+            {isHoliday && (
+              <Chip
+                icon={<EventBusyRoundedIcon fontSize="small" />}
+                label="Feriado"
+                size="small"
+                sx={{
+                  mt: 1,
+                  borderRadius: "6px",
+                  bgcolor: "#f5f3ff",
+                  color: "#6d28d9",
+                  fontWeight: 900,
+                }}
+              />
+            )}
           </Box>
           <IconButton
             aria-label="Fechar detalhes do dia"
@@ -1033,7 +1083,7 @@ function DayPopoverContent({
               color="text.secondary"
               sx={{ fontWeight: 800 }}
             >
-              {statusLabels[day.dayStatus]}
+              {isHoliday ? "Feriado" : statusLabels[day.dayStatus]}
             </Typography>
             <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", lineHeight: 1.2 }}>
               {minutesToHoursLabel(day.workedMinutes)}
@@ -1045,12 +1095,12 @@ function DayPopoverContent({
             </Typography>
           </Box>
           <Chip
-            label={hasRecords ? `${recordCount} itens` : "vazio"}
+            label={isHoliday ? "feriado" : hasRecords ? `${recordCount} itens` : "vazio"}
             size="small"
             sx={{
               borderRadius: "6px",
-              bgcolor: hasRecords ? "#eef2ff" : "#f3f0ea",
-              color: hasRecords ? "#4338ca" : nanaColors.muted,
+              bgcolor: isHoliday ? "#f5f3ff" : hasRecords ? "#eef2ff" : "#f3f0ea",
+              color: isHoliday ? "#6d28d9" : hasRecords ? "#4338ca" : nanaColors.muted,
               fontWeight: 900,
             }}
           />
@@ -1068,7 +1118,7 @@ function DayPopoverContent({
               color={statusColor}
               label="Status"
               surface="#f5f3ff"
-              value={statusLabels[day.dayStatus]}
+              value={isHoliday ? "Feriado" : statusLabels[day.dayStatus]}
             />
             <PopoverMetric
               color="#0f766e"
@@ -1130,6 +1180,44 @@ function DayPopoverContent({
                   Pausa
                 </Button>
               </Stack>
+            </Stack>
+          </Box>
+
+          <Box
+            component={motion.div}
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.7 }}
+            transition={{ duration: 0.2 }}
+            sx={{
+              borderRadius: "10px",
+              border: `1px solid ${isHoliday ? "#c4b5fd" : nanaColors.line}`,
+              bgcolor: isHoliday ? "#f5f3ff" : "#ffffff",
+              p: 1.25,
+            }}
+          >
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              sx={{ gap: 1, alignItems: { xs: "stretch", sm: "center" } }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                  Feriado
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Marque a data para aparecer nos resumos como feriado.
+                </Typography>
+              </Box>
+              <Button
+                color={isHoliday ? "warning" : "secondary"}
+                onClick={toggleHoliday}
+                size="small"
+                startIcon={<EventBusyRoundedIcon fontSize="small" />}
+                sx={{ borderRadius: "8px", whiteSpace: "nowrap" }}
+                variant={isHoliday ? "outlined" : "contained"}
+              >
+                {isHoliday ? "Remover" : "Marcar"}
+              </Button>
             </Stack>
           </Box>
 
@@ -1308,6 +1396,7 @@ function Legend() {
       <Chip label="Completo" sx={{ bgcolor: nanaColors.greenSoft }} />
       <Chip label="Excedeu" color="secondary" />
       <Chip label="Atenção" color="warning" />
+      <Chip label="Feriado" sx={{ bgcolor: "#f5f3ff", color: "#6d28d9" }} />
       <Chip label="Sem registro" />
     </Stack>
   );
@@ -1642,7 +1731,8 @@ function HistoryView({
       (limitFilter === "pending" && day.status !== "closed") ||
       (limitFilter === "complete" && day.status === "closed") ||
       (limitFilter === "edited" &&
-        [...day.entries, ...day.breaks].some((entry) => entry.isModified));
+        [...day.entries, ...day.breaks].some((entry) => entry.isModified)) ||
+      (limitFilter === "holiday" && day.mark?.type === "holiday");
 
     return (
       matchesSearch &&
@@ -1954,6 +2044,7 @@ function HistoryFilters({
                 <MenuItem value="pending">Pendentes</MenuItem>
                 <MenuItem value="complete">Fechados</MenuItem>
                 <MenuItem value="edited">Editados</MenuItem>
+                <MenuItem value="holiday">Feriados</MenuItem>
               </Select>
             </FormControl>
             <FormControl fullWidth>
@@ -2072,6 +2163,7 @@ function HistoryDayCard({
   const lunchStart = sortedEntries.find((entry) => entry.type === "lunch_start");
   const lunchEnd = sortedEntries.find((entry) => entry.type === "lunch_end");
   const hasEdits = [...day.entries, ...day.breaks].some((entry) => entry.isModified);
+  const isHoliday = day.mark?.type === "holiday";
 
   return (
     <Card component={motion.article} whileHover={{ y: -2 }}>
@@ -2085,6 +2177,18 @@ function HistoryDayCard({
               </Typography>
             </Box>
             <Stack direction="row" spacing={0.75} sx={{ alignItems: "flex-start" }}>
+              {isHoliday && (
+                <Chip
+                  icon={<EventBusyRoundedIcon fontSize="small" />}
+                  label="feriado"
+                  size="small"
+                  sx={{
+                    borderRadius: "6px",
+                    bgcolor: "#f5f3ff",
+                    color: "#6d28d9",
+                  }}
+                />
+              )}
               {hasEdits && (
                 <Chip label="editado" color="warning" size="small" />
               )}

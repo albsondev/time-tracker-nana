@@ -28,7 +28,18 @@ export type CalendarDayStatus =
   | "exceeded"
   | "negative"
   | "pending"
+  | "holiday"
   | "empty";
+
+export type DayMarkType = "holiday";
+
+export type DayMark = {
+  id: string;
+  userId: string;
+  date: string;
+  type: DayMarkType;
+  note?: string;
+};
 
 export type TimeEntry = {
   id: string;
@@ -61,6 +72,7 @@ export type DailySummary = {
   balanceMinutes: number;
   entries: TimeEntry[];
   breaks: BreakEntry[];
+  mark?: DayMark;
 };
 
 export type WeekSummary = {

@@ -15,15 +15,18 @@ import type {
   BreakEntry,
   CalendarDayStatus,
   DailySummary,
+  DayMark,
   HourBankMovement,
   TimeEntry,
 } from "@/domain/time/types";
 import {
   createBreakEntry,
   createTimeEntry,
+  deleteDayMark,
   loadUserTimeTrackingSnapshot,
   updateBreakEntry,
   updateTimeEntry,
+  upsertDayMark,
 } from "../data/time-tracking-repository";
 
 export type TimeTrackerState = ReturnType<typeof useTimeTracker>;
@@ -63,10 +66,15 @@ function getBreaksForDate(breaks: BreakEntry[], date: string) {
   return breaks.filter((entry) => entry.date === date);
 }
 
+function getMarkForDate(marks: DayMark[], date: string) {
+  return marks.find((mark) => mark.date === date);
+}
+
 function summarizeDates(params: {
   dates: string[];
   entries: TimeEntry[];
   breaks: BreakEntry[];
+  marks: DayMark[];
   now: Date;
 }) {
   return params.dates.map((date) =>
@@ -74,21 +82,28 @@ function summarizeDates(params: {
       date,
       entries: getEntriesForDate(params.entries, date),
       breaks: getBreaksForDate(params.breaks, date),
+      mark: getMarkForDate(params.marks, date),
       now: params.now,
     }),
   );
 }
 
-function getRegisteredDates(entries: TimeEntry[], breaks: BreakEntry[]) {
+function getRegisteredDates(
+  entries: TimeEntry[],
+  breaks: BreakEntry[],
+  marks: DayMark[],
+) {
   return Array.from(
     new Set([
       ...entries.map((entry) => toDateKey(new Date(entry.occurredAt))),
       ...breaks.map((entry) => entry.date),
+      ...marks.map((mark) => mark.date),
     ]),
   ).sort((first, second) => second.localeCompare(first));
 }
 
 function getCalendarStatus(summary: DailySummary, todayKey: string): CalendarDayStatus {
+  if (summary.mark?.type === "holiday") return "holiday";
   if (summary.date === todayKey) return "today";
   if (summary.entries.length === 0) return "empty";
   if (summary.status !== "closed") return "pending";
@@ -127,6 +142,7 @@ export function useTimeTracker(params: {
 }) {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [breaks, setBreaks] = useState<BreakEntry[]>([]);
+  const [marks, setMarks] = useState<DayMark[]>([]);
   const [movements, setMovements] = useState<HourBankMovement[]>([]);
   const [state, setState] = useState<LoadingState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +168,7 @@ export function useTimeTracker(params: {
       );
       setEntries(snapshot.entries);
       setBreaks(snapshot.breaks);
+      setMarks(snapshot.marks);
       setMovements(snapshot.movements);
       setState("ready");
     } catch (unknownError) {
@@ -204,9 +221,10 @@ export function useTimeTracker(params: {
         dates: monthDays,
         entries,
         breaks,
+        marks,
         now: today,
       }),
-    [breaks, entries, monthDays, today],
+    [breaks, entries, marks, monthDays, today],
   );
 
   const weekDailySummaries = useMemo(
@@ -215,9 +233,10 @@ export function useTimeTracker(params: {
         dates: weekDays,
         entries,
         breaks,
+        marks,
         now: today,
       }),
-    [breaks, entries, today, weekDays],
+    [breaks, entries, marks, today, weekDays],
   );
 
   const calendarDailySummaries = useMemo(
@@ -226,20 +245,22 @@ export function useTimeTracker(params: {
         dates: calendarMonthDays,
         entries,
         breaks,
+        marks,
         now: today,
       }),
-    [breaks, calendarMonthDays, entries, today],
+    [breaks, calendarMonthDays, entries, marks, today],
   );
 
   const historySummaries = useMemo(
     () =>
       summarizeDates({
-        dates: getRegisteredDates(entries, breaks),
+        dates: getRegisteredDates(entries, breaks, marks),
         entries,
         breaks,
+        marks,
         now: today,
       }),
-    [breaks, entries, today],
+    [breaks, entries, marks, today],
   );
 
   const hasTodayEntries = todayEntries.length > 0;
@@ -261,6 +282,7 @@ export function useTimeTracker(params: {
         balanceMinutes: summary.balanceMinutes,
         entries: summary.entries,
         breaks: summary.breaks,
+        mark: summary.mark,
         dayStatus: summary.status,
       })),
     [calendarDailySummaries, todayKey],
@@ -387,11 +409,38 @@ export function useTimeTracker(params: {
     await reload();
   }
 
+  async function toggleHoliday(date: string) {
+    if (!params.supabase || !params.userId) return;
+
+    const existingMark = marks.find(
+      (mark) => mark.date === date && mark.type === "holiday",
+    );
+
+    setState("loading");
+
+    if (existingMark) {
+      await deleteDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "holiday",
+      });
+    } else {
+      await upsertDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "holiday",
+      });
+    }
+
+    await reload();
+  }
+
   return {
     today,
     todayKey,
     entries,
     breaks,
+    marks,
     movements: hourBankMovements,
     todaySummary,
     hasTodayEntries,
@@ -414,5 +463,6 @@ export function useTimeTracker(params: {
     addBreak,
     editTimeEntry,
     editBreak,
+    toggleHoliday,
   };
 }

@@ -97,6 +97,32 @@ export type Database = {
           modified_at?: string | null;
         };
       };
+      day_marks: {
+        Row: {
+          id: string;
+          user_id: string;
+          work_date: string;
+          type: string;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          work_date: string;
+          type: string;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          work_date?: string;
+          type?: string;
+          note?: string | null;
+          updated_at?: string;
+        };
+      };
       hour_bank_movements: {
         Row: {
           id: string;
