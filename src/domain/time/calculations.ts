@@ -64,6 +64,14 @@ function createEmptyDaySummary(date: string): DailySummary {
   });
 }
 
+function isNonWorkingMark(mark?: DayMark) {
+  return mark?.type === "holiday" || mark?.type === "excluded";
+}
+
+function isExcludedDay(day: DailySummary) {
+  return day.mark?.type === "excluded";
+}
+
 export function calculateBreakMinutes(breaks: BreakEntry[]): number {
   return breaks
     .filter((entry) => entry.deductsFromWork && entry.endsAt)
@@ -126,20 +134,23 @@ export function summarizeDay(params: {
   const now = params.now ?? new Date();
   const effectiveNow =
     params.date === toDateKey(now) ? now : new Date(`${params.date}T00:00:00`);
-  const isHoliday = params.mark?.type === "holiday";
-  const workedMinutes = calculateWorkedMinutes(
+  const isExcluded = params.mark?.type === "excluded";
+  const rawWorkedMinutes = calculateWorkedMinutes(
     params.entries,
     breaks,
     effectiveNow,
   );
+  const workedMinutes = isExcluded ? 0 : rawWorkedMinutes;
+  const breakMinutes = isExcluded ? 0 : calculateBreakMinutes(breaks);
   const expectedMinutes =
-    params.expectedMinutes ?? (isHoliday ? 0 : DAILY_REFERENCE_MINUTES);
+    params.expectedMinutes ??
+    (isNonWorkingMark(params.mark) ? 0 : DAILY_REFERENCE_MINUTES);
 
   return {
     date: params.date,
     status: inferDayStatus(params.entries, breaks),
     workedMinutes,
-    breakMinutes: calculateBreakMinutes(breaks),
+    breakMinutes,
     balanceMinutes: workedMinutes - expectedMinutes,
     entries: params.entries,
     breaks,
@@ -158,7 +169,7 @@ export function summarizeWeek(params: {
       WEEKLY_EXPECTED_MINUTES,
       params.days.reduce(
         (total, day) =>
-          total + (day.mark?.type === "holiday" ? 0 : DAILY_REFERENCE_MINUTES),
+          total + (isNonWorkingMark(day.mark) ? 0 : DAILY_REFERENCE_MINUTES),
         0,
       ),
     );
@@ -206,10 +217,12 @@ export function calculateAutomaticWeeklyBankMovements(
         first.date.localeCompare(second.date),
       );
       const hasWorkRecords = sortedDays.some(
-        (day) => day.entries.length > 0 || day.breaks.length > 0,
+        (day) =>
+          !isExcludedDay(day) && (day.entries.length > 0 || day.breaks.length > 0),
       );
       const hasPendingRecords = sortedDays.some(
         (day) =>
+          !isExcludedDay(day) &&
           (day.entries.length > 0 || day.breaks.length > 0) &&
           day.status !== "closed",
       );
@@ -233,7 +246,7 @@ export function calculateAutomaticWeeklyBankMovements(
         expectedMinutes,
         weekDetails.reduce(
           (total, day) =>
-            total + (day.mark?.type === "holiday" ? 0 : DAILY_REFERENCE_MINUTES),
+            total + (isNonWorkingMark(day.mark) ? 0 : DAILY_REFERENCE_MINUTES),
           0,
         ),
       );

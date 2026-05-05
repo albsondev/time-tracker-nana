@@ -69,7 +69,16 @@ function getBreaksForDate(breaks: BreakEntry[], date: string) {
 }
 
 function getMarkForDate(marks: DayMark[], date: string) {
-  return marks.find((mark) => mark.date === date) ?? getNationalHoliday(date);
+  const excludedMark = marks.find(
+    (mark) => mark.date === date && mark.type === "excluded",
+  );
+
+  if (excludedMark) return excludedMark;
+
+  return (
+    marks.find((mark) => mark.date === date && mark.type === "holiday") ??
+    getNationalHoliday(date)
+  );
 }
 
 function summarizeDates(params: {
@@ -105,6 +114,7 @@ function getRegisteredDates(
 }
 
 function getCalendarStatus(summary: DailySummary, todayKey: string): CalendarDayStatus {
+  if (summary.mark?.type === "excluded") return "excluded";
   if (summary.mark?.type === "holiday") return "holiday";
   if (summary.date === todayKey) return "today";
   if (summary.entries.length === 0) return "empty";
@@ -278,7 +288,10 @@ export function useTimeTracker(params: {
         WEEKLY_EXPECTED_MINUTES,
         weekDailySummaries.reduce(
           (total, day) =>
-            total + (day.mark?.type === "holiday" ? 0 : DAILY_REFERENCE_MINUTES),
+            total +
+            (day.mark?.type === "holiday" || day.mark?.type === "excluded"
+              ? 0
+              : DAILY_REFERENCE_MINUTES),
           0,
         ),
       ),
@@ -450,6 +463,33 @@ export function useTimeTracker(params: {
     await reload();
   }
 
+  async function toggleExcludedDay(date: string) {
+    if (!params.supabase || !params.userId) return;
+
+    const existingMark = marks.find(
+      (mark) => mark.date === date && mark.type === "excluded",
+    );
+
+    setState("loading");
+
+    if (existingMark) {
+      await deleteDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "excluded",
+      });
+    } else {
+      await upsertDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "excluded",
+        note: "Dia limpo: ignorado na contabilização.",
+      });
+    }
+
+    await reload();
+  }
+
   return {
     today,
     todayKey,
@@ -480,5 +520,6 @@ export function useTimeTracker(params: {
     editTimeEntry,
     editBreak,
     toggleHoliday,
+    toggleExcludedDay,
   };
 }

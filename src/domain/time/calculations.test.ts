@@ -90,6 +90,27 @@ describe("time calculations", () => {
     expect(summary.mark?.type).toBe("holiday");
   });
 
+  it("ignores a cleared day without deleting its records", () => {
+    const summary = summarizeDay({
+      date: "2026-04-29",
+      entries: [
+        entry("1", "arrival", "2026-04-29T08:00:00-03:00"),
+        entry("2", "departure", "2026-04-29T15:00:00-03:00"),
+      ],
+      mark: {
+        id: "excluded-1",
+        userId,
+        date: "2026-04-29",
+        type: "excluded",
+      },
+    });
+
+    expect(summary.entries).toHaveLength(2);
+    expect(summary.workedMinutes).toBe(0);
+    expect(summary.breakMinutes).toBe(0);
+    expect(summary.balanceMinutes).toBe(0);
+  });
+
   it("creates weekly credit or debit based on the 30 hour target", () => {
     const week = summarizeWeek({
       weekStartsAt: "2026-04-27",
@@ -123,6 +144,34 @@ describe("time calculations", () => {
             userId,
             date: "2026-05-01",
             type: "holiday",
+          },
+        }),
+      ],
+    });
+
+    expect(week.expectedMinutes).toBe(24 * 60);
+    expect(week.balanceMinutes).toBe(0);
+  });
+
+  it("reduces the weekly target when a weekday is cleared", () => {
+    const week = summarizeWeek({
+      weekStartsAt: "2026-04-27",
+      days: [
+        { ...summarizeDay({ date: "2026-04-27", entries: [] }), workedMinutes: 360 },
+        { ...summarizeDay({ date: "2026-04-28", entries: [] }), workedMinutes: 360 },
+        { ...summarizeDay({ date: "2026-04-29", entries: [] }), workedMinutes: 360 },
+        { ...summarizeDay({ date: "2026-04-30", entries: [] }), workedMinutes: 360 },
+        summarizeDay({
+          date: "2026-05-01",
+          entries: [
+            entry("1", "arrival", "2026-05-01T08:00:00-03:00"),
+            entry("2", "departure", "2026-05-01T15:00:00-03:00"),
+          ],
+          mark: {
+            id: "excluded-1",
+            userId,
+            date: "2026-05-01",
+            type: "excluded",
           },
         }),
       ],
@@ -302,6 +351,61 @@ describe("time calculations", () => {
           entries: [
             entry("7", "arrival", "2026-04-30T08:00:00-03:00"),
             entry("8", "departure", "2026-04-30T14:00:00-03:00"),
+          ],
+        }),
+      ],
+      undefined,
+      new Date("2026-05-04T15:00:00-03:00"),
+    );
+
+    expect(movements).toHaveLength(0);
+  });
+
+  it("does not create weekly debit for launch week days marked as cleared", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-04-27",
+          entries: [],
+          mark: {
+            id: "excluded-1",
+            userId,
+            date: "2026-04-27",
+            type: "excluded",
+          },
+        }),
+        summarizeDay({
+          date: "2026-04-28",
+          entries: [],
+          mark: {
+            id: "excluded-2",
+            userId,
+            date: "2026-04-28",
+            type: "excluded",
+          },
+        }),
+        summarizeDay({
+          date: "2026-04-29",
+          entries: [],
+          mark: {
+            id: "excluded-3",
+            userId,
+            date: "2026-04-29",
+            type: "excluded",
+          },
+        }),
+        summarizeDay({
+          date: "2026-04-30",
+          entries: [
+            entry("1", "arrival", "2026-04-30T08:00:00-03:00"),
+            entry("2", "departure", "2026-04-30T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-01",
+          entries: [
+            entry("3", "arrival", "2026-05-01T08:00:00-03:00"),
+            entry("4", "departure", "2026-05-01T14:00:00-03:00"),
           ],
         }),
       ],

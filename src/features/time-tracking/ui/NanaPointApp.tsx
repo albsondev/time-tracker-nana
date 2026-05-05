@@ -6,6 +6,7 @@ import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import DeleteSweepRoundedIcon from "@mui/icons-material/DeleteSweepRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
@@ -92,7 +93,8 @@ type HistoryLimitFilter =
   | "pending"
   | "complete"
   | "edited"
-  | "holiday";
+  | "holiday"
+  | "excluded";
 
 const actionLabels: Record<TimeEntry["type"], string> = {
   arrival: "Cheguei no trabalho",
@@ -166,6 +168,7 @@ function recordMatchesSearch(
     formatWeekdayLongPtBr(day.date),
     statusLabels[day.status],
     day.mark?.type === "holiday" ? "feriado" : "",
+    day.mark?.type === "excluded" ? "dia limpo ignorado removido contabilização" : "",
     day.mark?.note ?? "",
     ...day.entries.flatMap((entry) => [
       actionLabels[entry.type],
@@ -301,6 +304,7 @@ export function NanaPointApp() {
                 onAddTime={(date) => setAddTarget({ kind: "time", date })}
                 onEdit={setEditTarget}
                 onToggleHoliday={tracker.toggleHoliday}
+                onToggleExcludedDay={tracker.toggleExcludedDay}
               />
             )}
             {tab === "bank" && <HourBankView tracker={tracker} />}
@@ -310,6 +314,7 @@ export function NanaPointApp() {
                 onAddBreak={(date) => setAddTarget({ kind: "break", date })}
                 onAddTime={(date) => setAddTarget({ kind: "time", date })}
                 onEdit={setEditTarget}
+                onToggleExcludedDay={tracker.toggleExcludedDay}
               />
             )}
             {tab === "profile" && (
@@ -692,12 +697,14 @@ function CalendarView({
   onAddTime,
   onEdit,
   onToggleHoliday,
+  onToggleExcludedDay,
 }: {
   tracker: ReturnType<typeof useTimeTracker>;
   onAddBreak: (date: string) => void;
   onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
   onToggleHoliday: (date: string) => Promise<void>;
+  onToggleExcludedDay: (date: string) => Promise<void>;
 }) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -708,6 +715,7 @@ function CalendarView({
     negative: "#fb8c00",
     pending: "#ef6c00",
     holiday: "#7c3aed",
+    excluded: "#64748b",
     empty: "#d8d1c6",
   };
   const selectedDay =
@@ -829,7 +837,9 @@ function CalendarView({
                     justifyContent: "center",
                     gap: 0.3,
                     bgcolor:
-                      day.status === "holiday"
+                      day.status === "excluded"
+                        ? "#f8fafc"
+                        : day.status === "holiday"
                         ? "#f5f3ff"
                         : day.status === "empty"
                           ? "#fffaf3"
@@ -869,6 +879,19 @@ function CalendarView({
                       }}
                     >
                       FER
+                    </Typography>
+                  )}
+                  {day.mark?.type === "excluded" && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#475569",
+                        fontSize: "0.56rem",
+                        fontWeight: 900,
+                        lineHeight: 1,
+                      }}
+                    >
+                      LIMPO
                     </Typography>
                   )}
                   <Box
@@ -914,6 +937,7 @@ function CalendarView({
             onEdit={onEdit}
             onAfterEdit={closeDay}
             onToggleHoliday={onToggleHoliday}
+            onToggleExcludedDay={onToggleExcludedDay}
           />
         )}
       </Popover>
@@ -944,6 +968,11 @@ function CalendarDayTooltip({
           Feriado: {day.mark.note ?? "marcado"}
         </Typography>
       )}
+      {day.mark?.type === "excluded" && (
+        <Typography sx={{ color: "#e2e8f0", fontWeight: 800, fontSize: "0.78rem" }}>
+          Dia limpo: não entra na contabilização
+        </Typography>
+      )}
       {(day.entries.length > 0 || day.breaks.length > 0) && (
         <Typography sx={{ fontSize: "0.78rem", mt: 0.35 }}>
           {minutesToHoursLabel(day.workedMinutes)} registrados
@@ -965,6 +994,7 @@ function DayPopoverContent({
   onEdit,
   onAfterEdit,
   onToggleHoliday,
+  onToggleExcludedDay,
 }: {
   day: ReturnType<typeof useTimeTracker>["calendarDays"][number];
   onAddBreak: (date: string) => void;
@@ -972,15 +1002,19 @@ function DayPopoverContent({
   onEdit: (target: EditTarget) => void;
   onAfterEdit: () => void;
   onToggleHoliday: (date: string) => Promise<void>;
+  onToggleExcludedDay: (date: string) => Promise<void>;
 }) {
   const hasRecords = day.entries.length > 0 || day.breaks.length > 0;
   const isHoliday = day.mark?.type === "holiday";
+  const isExcluded = day.mark?.type === "excluded";
   const balanceLabel =
     day.balanceMinutes === 0
       ? "0min"
       : minutesToHoursLabel(day.balanceMinutes);
   const statusColor =
-    isHoliday
+    isExcluded
+      ? "#475569"
+      : isHoliday
       ? "#7c3aed"
       : day.status === "empty"
       ? nanaColors.muted
@@ -988,6 +1022,17 @@ function DayPopoverContent({
         ? "#d97706"
         : "#2563eb";
   const recordCount = day.entries.length + day.breaks.length;
+  const dayStatusLabel = isExcluded
+    ? "Dia limpo"
+    : isHoliday
+      ? "Feriado"
+      : statusLabels[day.dayStatus];
+  const workedLabel = isExcluded ? "Ignorado" : minutesToHoursLabel(day.workedMinutes);
+  const balanceCaption = isExcluded
+    ? "Não contabiliza este dia"
+    : day.balanceMinutes === 0
+      ? "Sem saldo no dia"
+      : `${balanceLabel} de saldo`;
 
   function edit(target: EditTarget) {
     onEdit(target);
@@ -1006,6 +1051,10 @@ function DayPopoverContent({
 
   function toggleHoliday() {
     void onToggleHoliday(day.date).then(onAfterEdit);
+  }
+
+  function toggleExcludedDay() {
+    void onToggleExcludedDay(day.date).then(onAfterEdit);
   }
 
   return (
@@ -1046,6 +1095,20 @@ function DayPopoverContent({
                   borderRadius: "6px",
                   bgcolor: "#f5f3ff",
                   color: "#6d28d9",
+                  fontWeight: 900,
+                }}
+              />
+            )}
+            {isExcluded && (
+              <Chip
+                icon={<DeleteSweepRoundedIcon fontSize="small" />}
+                label="Dia limpo"
+                size="small"
+                sx={{
+                  mt: 1,
+                  borderRadius: "6px",
+                  bgcolor: "#f1f5f9",
+                  color: "#475569",
                   fontWeight: 900,
                 }}
               />
@@ -1127,24 +1190,42 @@ function DayPopoverContent({
               color="text.secondary"
               sx={{ fontWeight: 800 }}
             >
-              {isHoliday ? "Feriado" : statusLabels[day.dayStatus]}
+              {dayStatusLabel}
             </Typography>
             <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", lineHeight: 1.2 }}>
-              {minutesToHoursLabel(day.workedMinutes)}
+              {workedLabel}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {day.balanceMinutes === 0
-                ? "Sem saldo no dia"
-                : `${balanceLabel} de saldo`}
+              {balanceCaption}
             </Typography>
           </Box>
           <Chip
-            label={isHoliday ? "feriado" : hasRecords ? `${recordCount} itens` : "vazio"}
+            label={
+              isExcluded
+                ? "limpo"
+                : isHoliday
+                  ? "feriado"
+                  : hasRecords
+                    ? `${recordCount} itens`
+                    : "vazio"
+            }
             size="small"
             sx={{
               borderRadius: "6px",
-              bgcolor: isHoliday ? "#f5f3ff" : hasRecords ? "#eef2ff" : "#f3f0ea",
-              color: isHoliday ? "#6d28d9" : hasRecords ? "#4338ca" : nanaColors.muted,
+              bgcolor: isExcluded
+                ? "#f1f5f9"
+                : isHoliday
+                  ? "#f5f3ff"
+                  : hasRecords
+                    ? "#eef2ff"
+                    : "#f3f0ea",
+              color: isExcluded
+                ? "#475569"
+                : isHoliday
+                  ? "#6d28d9"
+                  : hasRecords
+                    ? "#4338ca"
+                    : nanaColors.muted,
               fontWeight: 900,
             }}
           />
@@ -1161,14 +1242,14 @@ function DayPopoverContent({
             <PopoverMetric
               color={statusColor}
               label="Status"
-              surface="#f5f3ff"
-              value={isHoliday ? "Feriado" : statusLabels[day.dayStatus]}
+              surface={isExcluded ? "#f8fafc" : "#f5f3ff"}
+              value={dayStatusLabel}
             />
             <PopoverMetric
-              color="#0f766e"
+              color={isExcluded ? "#475569" : "#0f766e"}
               label="Jornada"
-              surface="#f0fdfa"
-              value={minutesToHoursLabel(day.workedMinutes)}
+              surface={isExcluded ? "#f8fafc" : "#f0fdfa"}
+              value={workedLabel}
             />
             <PopoverMetric
               color={day.balanceMinutes < 0 ? "#d97706" : "#4f46e5"}
@@ -1176,6 +1257,49 @@ function DayPopoverContent({
               surface={day.balanceMinutes < 0 ? "#fff7ed" : "#eef2ff"}
               value={balanceLabel}
             />
+          </Box>
+
+          <Box
+            component={motion.div}
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.7 }}
+            transition={{ duration: 0.2 }}
+            sx={{
+              borderRadius: "10px",
+              border: `1px solid ${isExcluded ? "#94a3b8" : nanaColors.line}`,
+              bgcolor: isExcluded ? "#f8fafc" : "#ffffff",
+              p: 1.25,
+            }}
+          >
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              sx={{ gap: 1, alignItems: { xs: "stretch", sm: "center" } }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                  Dia limpo
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Ignora esta data no banco de horas sem apagar o histórico.
+                </Typography>
+              </Box>
+              <Button
+                color={isExcluded ? "secondary" : "inherit"}
+                onClick={toggleExcludedDay}
+                size="small"
+                startIcon={<DeleteSweepRoundedIcon fontSize="small" />}
+                sx={{
+                  borderRadius: "8px",
+                  whiteSpace: "nowrap",
+                  bgcolor: isExcluded ? undefined : "#f1f5f9",
+                  color: isExcluded ? undefined : "#475569",
+                }}
+                variant={isExcluded ? "contained" : "outlined"}
+              >
+                {isExcluded ? "Restaurar" : "Limpar dia"}
+              </Button>
+            </Stack>
           </Box>
 
           <Box
@@ -1441,6 +1565,7 @@ function Legend() {
       <Chip label="Excedeu" color="secondary" />
       <Chip label="Atenção" color="warning" />
       <Chip label="Feriado" sx={{ bgcolor: "#f5f3ff", color: "#6d28d9" }} />
+      <Chip label="Dia limpo" sx={{ bgcolor: "#f1f5f9", color: "#475569" }} />
       <Chip label="Sem registro" />
     </Stack>
   );
@@ -1689,15 +1814,19 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
                               {getHourBankDetailLabel(day)}
                             </Typography>
                           </Box>
-                          {day.mark?.type === "holiday" && day.workedMinutes === 0 ? (
+                          {(day.mark?.type === "holiday" ||
+                            day.mark?.type === "excluded") &&
+                          day.workedMinutes === 0 ? (
                             <Chip
-                              label="isento"
+                              label={day.mark.type === "excluded" ? "limpo" : "isento"}
                               size="small"
                               sx={{
                                 borderRadius: "6px",
                                 flexShrink: 0,
-                                bgcolor: "#f5f3ff",
-                                color: "#6d28d9",
+                                bgcolor:
+                                  day.mark.type === "excluded" ? "#f1f5f9" : "#f5f3ff",
+                                color:
+                                  day.mark.type === "excluded" ? "#475569" : "#6d28d9",
                               }}
                             />
                           ) : (
@@ -1722,6 +1851,12 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
 }
 
 function getHourBankDetailLabel(day: DailySummary) {
+  if (day.mark?.type === "excluded") {
+    return day.entries.length === 0 && day.breaks.length === 0
+      ? "Dia limpo"
+      : "Dia limpo · registros preservados";
+  }
+
   if (day.mark?.type === "holiday" && day.entries.length === 0 && day.breaks.length === 0) {
     return "Feriado";
   }
@@ -1748,11 +1883,13 @@ function HistoryView({
   onAddBreak,
   onAddTime,
   onEdit,
+  onToggleExcludedDay,
 }: {
   tracker: ReturnType<typeof useTimeTracker>;
   onAddBreak: (date: string) => void;
   onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
+  onToggleExcludedDay: (date: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -1797,7 +1934,8 @@ function HistoryView({
       (limitFilter === "complete" && day.status === "closed") ||
       (limitFilter === "edited" &&
         [...day.entries, ...day.breaks].some((entry) => entry.isModified)) ||
-      (limitFilter === "holiday" && day.mark?.type === "holiday");
+      (limitFilter === "holiday" && day.mark?.type === "holiday") ||
+      (limitFilter === "excluded" && day.mark?.type === "excluded");
 
     return (
       matchesSearch &&
@@ -1894,6 +2032,7 @@ function HistoryView({
         startDate={startDate}
         onAddBreak={onAddBreak}
         onAddTime={onAddTime}
+        onToggleExcludedDay={onToggleExcludedDay}
         onBreakCategoryChange={(value) => {
           setBreakCategory(value);
           resetPageAndExpansion();
@@ -1959,6 +2098,7 @@ function HistoryView({
               expanded={expandedDate === day.date}
               key={day.date}
               onEdit={onEdit}
+              onToggleExcludedDay={onToggleExcludedDay}
               onToggle={() =>
                 setExpandedHistoryDate(
                   expandedDate === day.date ? "none" : day.date,
@@ -2000,6 +2140,7 @@ function HistoryFilters({
   startDate,
   onAddBreak,
   onAddTime,
+  onToggleExcludedDay,
   onBreakCategoryChange,
   onEndDateChange,
   onEntryTypeChange,
@@ -2020,6 +2161,7 @@ function HistoryFilters({
   startDate: string;
   onAddBreak: (date: string) => void;
   onAddTime: (date: string) => void;
+  onToggleExcludedDay: (date: string) => Promise<void>;
   onBreakCategoryChange: (value: BreakCategory | "all") => void;
   onEndDateChange: (value: string) => void;
   onEntryTypeChange: (value: TimeEntry["type"] | "all") => void;
@@ -2110,6 +2252,7 @@ function HistoryFilters({
                 <MenuItem value="complete">Fechados</MenuItem>
                 <MenuItem value="edited">Editados</MenuItem>
                 <MenuItem value="holiday">Feriados</MenuItem>
+                <MenuItem value="excluded">Dias limpos</MenuItem>
               </Select>
             </FormControl>
             <FormControl fullWidth>
@@ -2200,6 +2343,21 @@ function HistoryFilters({
                 >
                   Adicionar pausa
                 </Button>
+                <Button
+                  disabled={!manualRecordDate}
+                  onClick={() => void onToggleExcludedDay(manualRecordDate)}
+                  startIcon={<DeleteSweepRoundedIcon fontSize="small" />}
+                  sx={{
+                    borderRadius: "8px",
+                    minHeight: 48,
+                    whiteSpace: "nowrap",
+                    color: "#475569",
+                    borderColor: "#cbd5e1",
+                  }}
+                  variant="outlined"
+                >
+                  Limpar dia
+                </Button>
               </Stack>
             </Stack>
           </Box>
@@ -2213,11 +2371,13 @@ function HistoryDayCard({
   day,
   expanded,
   onEdit,
+  onToggleExcludedDay,
   onToggle,
 }: {
   day: DailySummary;
   expanded: boolean;
   onEdit: (target: EditTarget) => void;
+  onToggleExcludedDay: (date: string) => Promise<void>;
   onToggle: () => void;
 }) {
   const sortedEntries = [...day.entries].sort((first, second) =>
@@ -2229,6 +2389,7 @@ function HistoryDayCard({
   const lunchEnd = sortedEntries.find((entry) => entry.type === "lunch_end");
   const hasEdits = [...day.entries, ...day.breaks].some((entry) => entry.isModified);
   const isHoliday = day.mark?.type === "holiday";
+  const isExcluded = day.mark?.type === "excluded";
 
   return (
     <Card component={motion.article} whileHover={{ y: -2 }}>
@@ -2254,10 +2415,25 @@ function HistoryDayCard({
                   }}
                 />
               )}
+              {isExcluded && (
+                <Chip
+                  icon={<DeleteSweepRoundedIcon fontSize="small" />}
+                  label="dia limpo"
+                  size="small"
+                  sx={{
+                    borderRadius: "6px",
+                    bgcolor: "#f1f5f9",
+                    color: "#475569",
+                  }}
+                />
+              )}
               {hasEdits && (
                 <Chip label="editado" color="warning" size="small" />
               )}
-              <Chip label={minutesToHoursLabel(day.workedMinutes)} color="secondary" />
+              <Chip
+                label={isExcluded ? "ignorado" : minutesToHoursLabel(day.workedMinutes)}
+                color={isExcluded ? "default" : "secondary"}
+              />
             </Stack>
           </Stack>
           <Box
@@ -2287,32 +2463,47 @@ function HistoryDayCard({
             />
             <HistoryMiniMetric label="Pausas" value={String(day.breaks.length)} />
           </Box>
-          <Button
-            aria-expanded={expanded}
-            aria-label={
-              expanded
-                ? `Recolher registros de ${formatDatePtBr(day.date)}`
-                : `Expandir registros de ${formatDatePtBr(day.date)}`
-            }
-            color="secondary"
-            endIcon={
-              <ExpandMoreRoundedIcon
-                sx={{
-                  transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 180ms ease",
-                }}
-              />
-            }
-            onClick={onToggle}
-            sx={{
-              alignSelf: "flex-start",
-              borderRadius: "8px",
-              px: 1.25,
-            }}
-            variant={expanded ? "contained" : "outlined"}
-          >
-            {expanded ? "Ocultar registros" : "Ver registros"}
-          </Button>
+          <Stack direction="row" sx={{ gap: 1, flexWrap: "wrap" }}>
+            <Button
+              aria-expanded={expanded}
+              aria-label={
+                expanded
+                  ? `Recolher registros de ${formatDatePtBr(day.date)}`
+                  : `Expandir registros de ${formatDatePtBr(day.date)}`
+              }
+              color="secondary"
+              endIcon={
+                <ExpandMoreRoundedIcon
+                  sx={{
+                    transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 180ms ease",
+                  }}
+                />
+              }
+              onClick={onToggle}
+              sx={{
+                borderRadius: "8px",
+                px: 1.25,
+              }}
+              variant={expanded ? "contained" : "outlined"}
+            >
+              {expanded ? "Ocultar registros" : "Ver registros"}
+            </Button>
+            <Button
+              color={isExcluded ? "secondary" : "inherit"}
+              onClick={() => void onToggleExcludedDay(day.date)}
+              startIcon={<DeleteSweepRoundedIcon fontSize="small" />}
+              sx={{
+                borderRadius: "8px",
+                px: 1.25,
+                color: isExcluded ? undefined : "#475569",
+                borderColor: isExcluded ? undefined : "#cbd5e1",
+              }}
+              variant={isExcluded ? "contained" : "outlined"}
+            >
+              {isExcluded ? "Restaurar dia" : "Limpar dia"}
+            </Button>
+          </Stack>
           <Collapse in={expanded} timeout="auto" unmountOnExit>
             <Stack spacing={1.5} sx={{ pt: 0.25 }}>
               <Divider />
