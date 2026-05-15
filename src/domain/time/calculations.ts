@@ -65,11 +65,15 @@ function createEmptyDaySummary(date: string): DailySummary {
 }
 
 function isNonWorkingMark(mark?: DayMark) {
-  return mark?.type === "holiday" || mark?.type === "excluded";
+  return (
+    mark?.type === "holiday" ||
+    mark?.type === "excluded" ||
+    mark?.type === "medical_leave"
+  );
 }
 
 function isExcludedDay(day: DailySummary) {
-  return day.mark?.type === "excluded";
+  return day.mark?.type === "excluded" || day.mark?.type === "medical_leave";
 }
 
 export function calculateBreakMinutes(breaks: BreakEntry[]): number {
@@ -134,14 +138,15 @@ export function summarizeDay(params: {
   const now = params.now ?? new Date();
   const effectiveNow =
     params.date === toDateKey(now) ? now : new Date(`${params.date}T00:00:00`);
-  const isExcluded = params.mark?.type === "excluded";
+  const shouldIgnoreWorkedTime =
+    params.mark?.type === "excluded" || params.mark?.type === "medical_leave";
   const rawWorkedMinutes = calculateWorkedMinutes(
     params.entries,
     breaks,
     effectiveNow,
   );
-  const workedMinutes = isExcluded ? 0 : rawWorkedMinutes;
-  const breakMinutes = isExcluded ? 0 : calculateBreakMinutes(breaks);
+  const workedMinutes = shouldIgnoreWorkedTime ? 0 : rawWorkedMinutes;
+  const breakMinutes = shouldIgnoreWorkedTime ? 0 : calculateBreakMinutes(breaks);
   const expectedMinutes =
     params.expectedMinutes ??
     (isNonWorkingMark(params.mark) ? 0 : DAILY_REFERENCE_MINUTES);

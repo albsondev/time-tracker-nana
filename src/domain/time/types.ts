@@ -30,9 +30,10 @@ export type CalendarDayStatus =
   | "pending"
   | "holiday"
   | "excluded"
+  | "medical_leave"
   | "empty";
 
-export type DayMarkType = "holiday" | "excluded";
+export type DayMarkType = "holiday" | "excluded" | "medical_leave";
 
 export type DayMark = {
   id: string;

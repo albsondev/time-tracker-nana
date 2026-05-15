@@ -111,6 +111,23 @@ describe("time calculations", () => {
     expect(summary.balanceMinutes).toBe(0);
   });
 
+  it("does not debit a day justified by a medical certificate", () => {
+    const summary = summarizeDay({
+      date: "2026-05-06",
+      entries: [],
+      mark: {
+        id: "medical-1",
+        userId,
+        date: "2026-05-06",
+        type: "medical_leave",
+      },
+    });
+
+    expect(summary.workedMinutes).toBe(0);
+    expect(summary.balanceMinutes).toBe(0);
+    expect(summary.mark?.type).toBe("medical_leave");
+  });
+
   it("creates weekly credit or debit based on the 30 hour target", () => {
     const week = summarizeWeek({
       weekStartsAt: "2026-04-27",
@@ -174,6 +191,31 @@ describe("time calculations", () => {
             type: "excluded",
           },
         }),
+      ],
+    });
+
+    expect(week.expectedMinutes).toBe(24 * 60);
+    expect(week.balanceMinutes).toBe(0);
+  });
+
+  it("reduces the weekly target when a weekday has a medical certificate", () => {
+    const week = summarizeWeek({
+      weekStartsAt: "2026-05-04",
+      days: [
+        { ...summarizeDay({ date: "2026-05-04", entries: [] }), workedMinutes: 360 },
+        { ...summarizeDay({ date: "2026-05-05", entries: [] }), workedMinutes: 360 },
+        summarizeDay({
+          date: "2026-05-06",
+          entries: [],
+          mark: {
+            id: "medical-1",
+            userId,
+            date: "2026-05-06",
+            type: "medical_leave",
+          },
+        }),
+        { ...summarizeDay({ date: "2026-05-07", entries: [] }), workedMinutes: 360 },
+        { ...summarizeDay({ date: "2026-05-08", entries: [] }), workedMinutes: 360 },
       ],
     });
 
@@ -411,6 +453,55 @@ describe("time calculations", () => {
       ],
       undefined,
       new Date("2026-05-04T15:00:00-03:00"),
+    );
+
+    expect(movements).toHaveLength(0);
+  });
+
+  it("does not create weekly debit for a medical certificate absence", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-05-04",
+          entries: [
+            entry("1", "arrival", "2026-05-04T08:00:00-03:00"),
+            entry("2", "departure", "2026-05-04T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-05",
+          entries: [
+            entry("3", "arrival", "2026-05-05T08:00:00-03:00"),
+            entry("4", "departure", "2026-05-05T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-06",
+          entries: [],
+          mark: {
+            id: "medical-1",
+            userId,
+            date: "2026-05-06",
+            type: "medical_leave",
+          },
+        }),
+        summarizeDay({
+          date: "2026-05-07",
+          entries: [
+            entry("5", "arrival", "2026-05-07T08:00:00-03:00"),
+            entry("6", "departure", "2026-05-07T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-08",
+          entries: [
+            entry("7", "arrival", "2026-05-08T08:00:00-03:00"),
+            entry("8", "departure", "2026-05-08T14:00:00-03:00"),
+          ],
+        }),
+      ],
+      undefined,
+      new Date("2026-05-11T15:00:00-03:00"),
     );
 
     expect(movements).toHaveLength(0);

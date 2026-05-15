@@ -15,6 +15,7 @@ import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import KeyboardDoubleArrowLeftRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowLeftRounded";
 import KeyboardDoubleArrowRightRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowRightRounded";
+import LocalHospitalRoundedIcon from "@mui/icons-material/LocalHospitalRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
@@ -94,7 +95,8 @@ type HistoryLimitFilter =
   | "complete"
   | "edited"
   | "holiday"
-  | "excluded";
+  | "excluded"
+  | "medical_leave";
 
 const actionLabels: Record<TimeEntry["type"], string> = {
   arrival: "Cheguei no trabalho",
@@ -169,6 +171,9 @@ function recordMatchesSearch(
     statusLabels[day.status],
     day.mark?.type === "holiday" ? "feriado" : "",
     day.mark?.type === "excluded" ? "dia limpo ignorado removido contabilização" : "",
+    day.mark?.type === "medical_leave"
+      ? "atestado médico declaração médica ausência justificada consulta médica"
+      : "",
     day.mark?.note ?? "",
     ...day.entries.flatMap((entry) => [
       actionLabels[entry.type],
@@ -305,6 +310,7 @@ export function NanaPointApp() {
                 onEdit={setEditTarget}
                 onToggleHoliday={tracker.toggleHoliday}
                 onToggleExcludedDay={tracker.toggleExcludedDay}
+                onToggleMedicalLeave={tracker.toggleMedicalLeave}
               />
             )}
             {tab === "bank" && <HourBankView tracker={tracker} />}
@@ -315,6 +321,7 @@ export function NanaPointApp() {
                 onAddTime={(date) => setAddTarget({ kind: "time", date })}
                 onEdit={setEditTarget}
                 onToggleExcludedDay={tracker.toggleExcludedDay}
+                onToggleMedicalLeave={tracker.toggleMedicalLeave}
               />
             )}
             {tab === "profile" && (
@@ -698,6 +705,7 @@ function CalendarView({
   onEdit,
   onToggleHoliday,
   onToggleExcludedDay,
+  onToggleMedicalLeave,
 }: {
   tracker: ReturnType<typeof useTimeTracker>;
   onAddBreak: (date: string) => void;
@@ -705,6 +713,7 @@ function CalendarView({
   onEdit: (target: EditTarget) => void;
   onToggleHoliday: (date: string) => Promise<void>;
   onToggleExcludedDay: (date: string) => Promise<void>;
+  onToggleMedicalLeave: (date: string) => Promise<void>;
 }) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -716,6 +725,7 @@ function CalendarView({
     pending: "#ef6c00",
     holiday: "#7c3aed",
     excluded: "#64748b",
+    medical_leave: "#dc2626",
     empty: "#d8d1c6",
   };
   const selectedDay =
@@ -839,6 +849,8 @@ function CalendarView({
                     bgcolor:
                       day.status === "excluded"
                         ? "#f8fafc"
+                        : day.status === "medical_leave"
+                          ? "#fff1f2"
                         : day.status === "holiday"
                         ? "#f5f3ff"
                         : day.status === "empty"
@@ -894,6 +906,19 @@ function CalendarView({
                       LIMPO
                     </Typography>
                   )}
+                  {day.mark?.type === "medical_leave" && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#be123c",
+                        fontSize: "0.56rem",
+                        fontWeight: 900,
+                        lineHeight: 1,
+                      }}
+                    >
+                      MED
+                    </Typography>
+                  )}
                   <Box
                     sx={{
                       width: 7,
@@ -938,6 +963,7 @@ function CalendarView({
             onAfterEdit={closeDay}
             onToggleHoliday={onToggleHoliday}
             onToggleExcludedDay={onToggleExcludedDay}
+            onToggleMedicalLeave={onToggleMedicalLeave}
           />
         )}
       </Popover>
@@ -973,6 +999,11 @@ function CalendarDayTooltip({
           Dia limpo: não entra na contabilização
         </Typography>
       )}
+      {day.mark?.type === "medical_leave" && (
+        <Typography sx={{ color: "#fecdd3", fontWeight: 800, fontSize: "0.78rem" }}>
+          Atestado médico: ausência justificada
+        </Typography>
+      )}
       {(day.entries.length > 0 || day.breaks.length > 0) && (
         <Typography sx={{ fontSize: "0.78rem", mt: 0.35 }}>
           {minutesToHoursLabel(day.workedMinutes)} registrados
@@ -995,6 +1026,7 @@ function DayPopoverContent({
   onAfterEdit,
   onToggleHoliday,
   onToggleExcludedDay,
+  onToggleMedicalLeave,
 }: {
   day: ReturnType<typeof useTimeTracker>["calendarDays"][number];
   onAddBreak: (date: string) => void;
@@ -1003,10 +1035,12 @@ function DayPopoverContent({
   onAfterEdit: () => void;
   onToggleHoliday: (date: string) => Promise<void>;
   onToggleExcludedDay: (date: string) => Promise<void>;
+  onToggleMedicalLeave: (date: string) => Promise<void>;
 }) {
   const hasRecords = day.entries.length > 0 || day.breaks.length > 0;
   const isHoliday = day.mark?.type === "holiday";
   const isExcluded = day.mark?.type === "excluded";
+  const isMedicalLeave = day.mark?.type === "medical_leave";
   const balanceLabel =
     day.balanceMinutes === 0
       ? "0min"
@@ -1014,6 +1048,8 @@ function DayPopoverContent({
   const statusColor =
     isExcluded
       ? "#475569"
+      : isMedicalLeave
+        ? "#be123c"
       : isHoliday
       ? "#7c3aed"
       : day.status === "empty"
@@ -1024,12 +1060,17 @@ function DayPopoverContent({
   const recordCount = day.entries.length + day.breaks.length;
   const dayStatusLabel = isExcluded
     ? "Dia limpo"
+    : isMedicalLeave
+      ? "Atestado médico"
     : isHoliday
       ? "Feriado"
       : statusLabels[day.dayStatus];
-  const workedLabel = isExcluded ? "Ignorado" : minutesToHoursLabel(day.workedMinutes);
+  const workedLabel =
+    isExcluded || isMedicalLeave ? "Ignorado" : minutesToHoursLabel(day.workedMinutes);
   const balanceCaption = isExcluded
     ? "Não contabiliza este dia"
+    : isMedicalLeave
+      ? "Ausência justificada"
     : day.balanceMinutes === 0
       ? "Sem saldo no dia"
       : `${balanceLabel} de saldo`;
@@ -1055,6 +1096,10 @@ function DayPopoverContent({
 
   function toggleExcludedDay() {
     void onToggleExcludedDay(day.date).then(onAfterEdit);
+  }
+
+  function toggleMedicalLeave() {
+    void onToggleMedicalLeave(day.date).then(onAfterEdit);
   }
 
   return (
@@ -1109,6 +1154,20 @@ function DayPopoverContent({
                   borderRadius: "6px",
                   bgcolor: "#f1f5f9",
                   color: "#475569",
+                  fontWeight: 900,
+                }}
+              />
+            )}
+            {isMedicalLeave && (
+              <Chip
+                icon={<LocalHospitalRoundedIcon fontSize="small" />}
+                label="Atestado médico"
+                size="small"
+                sx={{
+                  mt: 1,
+                  borderRadius: "6px",
+                  bgcolor: "#fff1f2",
+                  color: "#be123c",
                   fontWeight: 900,
                 }}
               />
@@ -1203,6 +1262,8 @@ function DayPopoverContent({
             label={
               isExcluded
                 ? "limpo"
+                : isMedicalLeave
+                  ? "atestado"
                 : isHoliday
                   ? "feriado"
                   : hasRecords
@@ -1214,6 +1275,8 @@ function DayPopoverContent({
               borderRadius: "6px",
               bgcolor: isExcluded
                 ? "#f1f5f9"
+                : isMedicalLeave
+                  ? "#fff1f2"
                 : isHoliday
                   ? "#f5f3ff"
                   : hasRecords
@@ -1221,6 +1284,8 @@ function DayPopoverContent({
                     : "#f3f0ea",
               color: isExcluded
                 ? "#475569"
+                : isMedicalLeave
+                  ? "#be123c"
                 : isHoliday
                   ? "#6d28d9"
                   : hasRecords
@@ -1242,13 +1307,15 @@ function DayPopoverContent({
             <PopoverMetric
               color={statusColor}
               label="Status"
-              surface={isExcluded ? "#f8fafc" : "#f5f3ff"}
+              surface={
+                isExcluded ? "#f8fafc" : isMedicalLeave ? "#fff1f2" : "#f5f3ff"
+              }
               value={dayStatusLabel}
             />
             <PopoverMetric
-              color={isExcluded ? "#475569" : "#0f766e"}
+              color={isExcluded || isMedicalLeave ? "#475569" : "#0f766e"}
               label="Jornada"
-              surface={isExcluded ? "#f8fafc" : "#f0fdfa"}
+              surface={isExcluded || isMedicalLeave ? "#f8fafc" : "#f0fdfa"}
               value={workedLabel}
             />
             <PopoverMetric
@@ -1257,6 +1324,49 @@ function DayPopoverContent({
               surface={day.balanceMinutes < 0 ? "#fff7ed" : "#eef2ff"}
               value={balanceLabel}
             />
+          </Box>
+
+          <Box
+            component={motion.div}
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.7 }}
+            transition={{ duration: 0.2 }}
+            sx={{
+              borderRadius: "10px",
+              border: `1px solid ${isMedicalLeave ? "#fecdd3" : nanaColors.line}`,
+              bgcolor: isMedicalLeave ? "#fff1f2" : "#ffffff",
+              p: 1.25,
+            }}
+          >
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              sx={{ gap: 1, alignItems: { xs: "stretch", sm: "center" } }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                  Atestado médico
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Justifica a ausência por consulta, declaração ou atestado médico.
+                </Typography>
+              </Box>
+              <Button
+                color={isMedicalLeave ? "error" : "inherit"}
+                onClick={toggleMedicalLeave}
+                size="small"
+                startIcon={<LocalHospitalRoundedIcon fontSize="small" />}
+                sx={{
+                  borderRadius: "8px",
+                  whiteSpace: "nowrap",
+                  bgcolor: isMedicalLeave ? undefined : "#fff1f2",
+                  color: isMedicalLeave ? undefined : "#be123c",
+                }}
+                variant={isMedicalLeave ? "contained" : "outlined"}
+              >
+                {isMedicalLeave ? "Remover" : "Marcar"}
+              </Button>
+            </Stack>
           </Box>
 
           <Box
@@ -1566,6 +1676,7 @@ function Legend() {
       <Chip label="Atenção" color="warning" />
       <Chip label="Feriado" sx={{ bgcolor: "#f5f3ff", color: "#6d28d9" }} />
       <Chip label="Dia limpo" sx={{ bgcolor: "#f1f5f9", color: "#475569" }} />
+      <Chip label="Atestado" sx={{ bgcolor: "#fff1f2", color: "#be123c" }} />
       <Chip label="Sem registro" />
     </Stack>
   );
@@ -1815,18 +1926,33 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
                             </Typography>
                           </Box>
                           {(day.mark?.type === "holiday" ||
-                            day.mark?.type === "excluded") &&
+                            day.mark?.type === "excluded" ||
+                            day.mark?.type === "medical_leave") &&
                           day.workedMinutes === 0 ? (
                             <Chip
-                              label={day.mark.type === "excluded" ? "limpo" : "isento"}
+                              label={
+                                day.mark.type === "excluded"
+                                  ? "limpo"
+                                  : day.mark.type === "medical_leave"
+                                    ? "atestado"
+                                    : "isento"
+                              }
                               size="small"
                               sx={{
                                 borderRadius: "6px",
                                 flexShrink: 0,
                                 bgcolor:
-                                  day.mark.type === "excluded" ? "#f1f5f9" : "#f5f3ff",
+                                  day.mark.type === "excluded"
+                                    ? "#f1f5f9"
+                                    : day.mark.type === "medical_leave"
+                                      ? "#fff1f2"
+                                      : "#f5f3ff",
                                 color:
-                                  day.mark.type === "excluded" ? "#475569" : "#6d28d9",
+                                  day.mark.type === "excluded"
+                                    ? "#475569"
+                                    : day.mark.type === "medical_leave"
+                                      ? "#be123c"
+                                      : "#6d28d9",
                               }}
                             />
                           ) : (
@@ -1851,6 +1977,12 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
 }
 
 function getHourBankDetailLabel(day: DailySummary) {
+  if (day.mark?.type === "medical_leave") {
+    return day.entries.length === 0 && day.breaks.length === 0
+      ? "Atestado médico"
+      : "Atestado médico · registros preservados";
+  }
+
   if (day.mark?.type === "excluded") {
     return day.entries.length === 0 && day.breaks.length === 0
       ? "Dia limpo"
@@ -1884,12 +2016,14 @@ function HistoryView({
   onAddTime,
   onEdit,
   onToggleExcludedDay,
+  onToggleMedicalLeave,
 }: {
   tracker: ReturnType<typeof useTimeTracker>;
   onAddBreak: (date: string) => void;
   onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
   onToggleExcludedDay: (date: string) => Promise<void>;
+  onToggleMedicalLeave: (date: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -1935,7 +2069,8 @@ function HistoryView({
       (limitFilter === "edited" &&
         [...day.entries, ...day.breaks].some((entry) => entry.isModified)) ||
       (limitFilter === "holiday" && day.mark?.type === "holiday") ||
-      (limitFilter === "excluded" && day.mark?.type === "excluded");
+      (limitFilter === "excluded" && day.mark?.type === "excluded") ||
+      (limitFilter === "medical_leave" && day.mark?.type === "medical_leave");
 
     return (
       matchesSearch &&
@@ -2033,6 +2168,7 @@ function HistoryView({
         onAddBreak={onAddBreak}
         onAddTime={onAddTime}
         onToggleExcludedDay={onToggleExcludedDay}
+        onToggleMedicalLeave={onToggleMedicalLeave}
         onBreakCategoryChange={(value) => {
           setBreakCategory(value);
           resetPageAndExpansion();
@@ -2099,6 +2235,7 @@ function HistoryView({
               key={day.date}
               onEdit={onEdit}
               onToggleExcludedDay={onToggleExcludedDay}
+              onToggleMedicalLeave={onToggleMedicalLeave}
               onToggle={() =>
                 setExpandedHistoryDate(
                   expandedDate === day.date ? "none" : day.date,
@@ -2141,6 +2278,7 @@ function HistoryFilters({
   onAddBreak,
   onAddTime,
   onToggleExcludedDay,
+  onToggleMedicalLeave,
   onBreakCategoryChange,
   onEndDateChange,
   onEntryTypeChange,
@@ -2162,6 +2300,7 @@ function HistoryFilters({
   onAddBreak: (date: string) => void;
   onAddTime: (date: string) => void;
   onToggleExcludedDay: (date: string) => Promise<void>;
+  onToggleMedicalLeave: (date: string) => Promise<void>;
   onBreakCategoryChange: (value: BreakCategory | "all") => void;
   onEndDateChange: (value: string) => void;
   onEntryTypeChange: (value: TimeEntry["type"] | "all") => void;
@@ -2253,6 +2392,7 @@ function HistoryFilters({
                 <MenuItem value="edited">Editados</MenuItem>
                 <MenuItem value="holiday">Feriados</MenuItem>
                 <MenuItem value="excluded">Dias limpos</MenuItem>
+                <MenuItem value="medical_leave">Atestados médicos</MenuItem>
               </Select>
             </FormControl>
             <FormControl fullWidth>
@@ -2358,6 +2498,22 @@ function HistoryFilters({
                 >
                   Limpar dia
                 </Button>
+                <Button
+                  disabled={!manualRecordDate}
+                  onClick={() => void onToggleMedicalLeave(manualRecordDate)}
+                  startIcon={<LocalHospitalRoundedIcon fontSize="small" />}
+                  sx={{
+                    borderRadius: "8px",
+                    minHeight: 48,
+                    whiteSpace: "nowrap",
+                    color: "#be123c",
+                    borderColor: "#fecdd3",
+                    bgcolor: "#fff1f2",
+                  }}
+                  variant="outlined"
+                >
+                  Atestado
+                </Button>
               </Stack>
             </Stack>
           </Box>
@@ -2372,12 +2528,14 @@ function HistoryDayCard({
   expanded,
   onEdit,
   onToggleExcludedDay,
+  onToggleMedicalLeave,
   onToggle,
 }: {
   day: DailySummary;
   expanded: boolean;
   onEdit: (target: EditTarget) => void;
   onToggleExcludedDay: (date: string) => Promise<void>;
+  onToggleMedicalLeave: (date: string) => Promise<void>;
   onToggle: () => void;
 }) {
   const sortedEntries = [...day.entries].sort((first, second) =>
@@ -2390,6 +2548,7 @@ function HistoryDayCard({
   const hasEdits = [...day.entries, ...day.breaks].some((entry) => entry.isModified);
   const isHoliday = day.mark?.type === "holiday";
   const isExcluded = day.mark?.type === "excluded";
+  const isMedicalLeave = day.mark?.type === "medical_leave";
 
   return (
     <Card component={motion.article} whileHover={{ y: -2 }}>
@@ -2427,12 +2586,28 @@ function HistoryDayCard({
                   }}
                 />
               )}
+              {isMedicalLeave && (
+                <Chip
+                  icon={<LocalHospitalRoundedIcon fontSize="small" />}
+                  label="atestado"
+                  size="small"
+                  sx={{
+                    borderRadius: "6px",
+                    bgcolor: "#fff1f2",
+                    color: "#be123c",
+                  }}
+                />
+              )}
               {hasEdits && (
                 <Chip label="editado" color="warning" size="small" />
               )}
               <Chip
-                label={isExcluded ? "ignorado" : minutesToHoursLabel(day.workedMinutes)}
-                color={isExcluded ? "default" : "secondary"}
+                label={
+                  isExcluded || isMedicalLeave
+                    ? "ignorado"
+                    : minutesToHoursLabel(day.workedMinutes)
+                }
+                color={isExcluded || isMedicalLeave ? "default" : "secondary"}
               />
             </Stack>
           </Stack>
@@ -2502,6 +2677,21 @@ function HistoryDayCard({
               variant={isExcluded ? "contained" : "outlined"}
             >
               {isExcluded ? "Restaurar dia" : "Limpar dia"}
+            </Button>
+            <Button
+              color={isMedicalLeave ? "error" : "inherit"}
+              onClick={() => void onToggleMedicalLeave(day.date)}
+              startIcon={<LocalHospitalRoundedIcon fontSize="small" />}
+              sx={{
+                borderRadius: "8px",
+                px: 1.25,
+                color: isMedicalLeave ? undefined : "#be123c",
+                borderColor: isMedicalLeave ? undefined : "#fecdd3",
+                bgcolor: isMedicalLeave ? undefined : "#fff1f2",
+              }}
+              variant={isMedicalLeave ? "contained" : "outlined"}
+            >
+              {isMedicalLeave ? "Remover atestado" : "Atestado"}
             </Button>
           </Stack>
           <Collapse in={expanded} timeout="auto" unmountOnExit>

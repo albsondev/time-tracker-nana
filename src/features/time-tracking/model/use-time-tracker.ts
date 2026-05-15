@@ -75,6 +75,12 @@ function getMarkForDate(marks: DayMark[], date: string) {
 
   if (excludedMark) return excludedMark;
 
+  const medicalLeaveMark = marks.find(
+    (mark) => mark.date === date && mark.type === "medical_leave",
+  );
+
+  if (medicalLeaveMark) return medicalLeaveMark;
+
   return (
     marks.find((mark) => mark.date === date && mark.type === "holiday") ??
     getNationalHoliday(date)
@@ -115,6 +121,7 @@ function getRegisteredDates(
 
 function getCalendarStatus(summary: DailySummary, todayKey: string): CalendarDayStatus {
   if (summary.mark?.type === "excluded") return "excluded";
+  if (summary.mark?.type === "medical_leave") return "medical_leave";
   if (summary.mark?.type === "holiday") return "holiday";
   if (summary.date === todayKey) return "today";
   if (summary.entries.length === 0) return "empty";
@@ -287,11 +294,14 @@ export function useTimeTracker(params: {
       Math.min(
         WEEKLY_EXPECTED_MINUTES,
         weekDailySummaries.reduce(
-          (total, day) =>
-            total +
-            (day.mark?.type === "holiday" || day.mark?.type === "excluded"
-              ? 0
-              : DAILY_REFERENCE_MINUTES),
+          (total, day) => {
+            const isNonWorkingDay =
+              day.mark?.type === "holiday" ||
+              day.mark?.type === "excluded" ||
+              day.mark?.type === "medical_leave";
+
+            return total + (isNonWorkingDay ? 0 : DAILY_REFERENCE_MINUTES);
+          },
           0,
         ),
       ),
@@ -453,10 +463,47 @@ export function useTimeTracker(params: {
         type: "holiday",
       });
     } else {
+      await deleteDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "medical_leave",
+      });
       await upsertDayMark(params.supabase, {
         userId: params.userId,
         date,
         type: "holiday",
+      });
+    }
+
+    await reload();
+  }
+
+  async function toggleMedicalLeave(date: string) {
+    if (!params.supabase || !params.userId) return;
+
+    const existingMark = marks.find(
+      (mark) => mark.date === date && mark.type === "medical_leave",
+    );
+
+    setState("loading");
+
+    if (existingMark) {
+      await deleteDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "medical_leave",
+      });
+    } else {
+      await deleteDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "excluded",
+      });
+      await upsertDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "medical_leave",
+        note: "Ausência justificada por atestado ou declaração médica.",
       });
     }
 
@@ -521,5 +568,6 @@ export function useTimeTracker(params: {
     editBreak,
     toggleHoliday,
     toggleExcludedDay,
+    toggleMedicalLeave,
   };
 }
