@@ -287,7 +287,10 @@ export function NanaPointApp() {
         pb: 11,
       }}
     >
-      <Container maxWidth="sm" sx={{ px: { xs: 1.25, sm: 2 }, py: { xs: 1.75, sm: 2.5 } }}>
+      <Container
+        maxWidth={tab === "calendar" ? "lg" : "sm"}
+        sx={{ px: { xs: 1.25, sm: 2 }, py: { xs: 1.75, sm: 2.5 } }}
+      >
         <AppHeader
           bankBalance={tracker.hourBankBalance}
           displayName={displayName}
@@ -735,6 +738,60 @@ function SummaryGrid({ items }: { items: [string, string, string][] }) {
   );
 }
 
+type CalendarDayItem = ReturnType<typeof useTimeTracker>["calendarDays"][number];
+
+const calendarWeekdayLabels = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"];
+
+function getCalendarLeadingSlots(date: Date) {
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1, 12);
+  const weekDay = firstDay.getDay();
+
+  return weekDay === 0 ? 6 : weekDay - 1;
+}
+
+function getCalendarCellTone(day: CalendarDayItem) {
+  if (day.mark?.type === "medical_leave") {
+    return { label: "Atestado", bg: "#fff1f2", border: "#fecdd3", accent: "#be123c", chip: "#ffe4e6" };
+  }
+
+  if (day.mark?.type === "holiday") {
+    return { label: "Feriado", bg: "#f5f3ff", border: "#c4b5fd", accent: "#6d28d9", chip: "#ede9fe" };
+  }
+
+  if (day.mark?.type === "excluded") {
+    return { label: "Limpo", bg: "#f8fafc", border: "#cbd5e1", accent: "#475569", chip: "#f1f5f9" };
+  }
+
+  if (day.status === "pending") {
+    return { label: "Pendente", bg: "#fffbeb", border: "#fde68a", accent: "#b45309", chip: "#fef3c7" };
+  }
+
+  if (day.balanceMinutes < 0) {
+    return { label: "Negativo", bg: "#fff1f2", border: "#fecdd3", accent: "#dc2626", chip: "#ffe4e6" };
+  }
+
+  if (day.balanceMinutes > 0) {
+    return { label: "Crédito", bg: "#ecfdf5", border: "#a7f3d0", accent: "#047857", chip: "#dcfce7" };
+  }
+
+  if (day.status === "today") {
+    return { label: "Hoje", bg: "#fff7ed", border: "#fed7aa", accent: "#f57c00", chip: "#ffedd5" };
+  }
+
+  return { label: day.entries.length > 0 || day.breaks.length > 0 ? "Ok" : "", bg: "#f7f6f3", border: "#efebe4", accent: "#64748b", chip: "#ffffff" };
+}
+
+function shouldShowCalendarSidebarDay(day: CalendarDayItem) {
+  return (
+    day.mark?.type === "holiday" ||
+    day.mark?.type === "medical_leave" ||
+    day.mark?.type === "excluded" ||
+    day.status === "pending" ||
+    day.balanceMinutes < 0 ||
+    day.balanceMinutes > 0
+  );
+}
+
 function CalendarView({
   tracker,
   onAddBreak,
@@ -756,23 +813,23 @@ function CalendarView({
 }) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const colors = {
-    today: nanaColors.orange,
-    complete: nanaColors.green,
-    exceeded: "#43a047",
-    negative: "#fb8c00",
-    pending: "#ef6c00",
-    holiday: "#7c3aed",
-    excluded: "#64748b",
-    medical_leave: "#dc2626",
-    empty: "#d8d1c6",
-  };
   const selectedDay =
     tracker.calendarDays.find((day) => day.date === selectedDate) ?? null;
   const popoverOpen = Boolean(anchorEl && selectedDay);
   const isCurrentMonth =
     tracker.calendarMonth.getFullYear() === tracker.today.getFullYear() &&
     tracker.calendarMonth.getMonth() === tracker.today.getMonth();
+  const leadingSlots = getCalendarLeadingSlots(tracker.calendarMonth);
+  const calendarCells = [
+    ...Array.from<null>({ length: leadingSlots }).fill(null),
+    ...tracker.calendarDays,
+  ];
+  const trailingSlots = (7 - (calendarCells.length % 7)) % 7;
+  const paddedCalendarCells = [
+    ...calendarCells,
+    ...Array.from<null>({ length: trailingSlots }).fill(null),
+  ];
+  const sidebarDays = tracker.calendarDays.filter(shouldShowCalendarSidebarDay);
 
   function openDay(event: MouseEvent<HTMLElement>, date: string) {
     setAnchorEl(event.currentTarget);
@@ -855,122 +912,164 @@ function CalendarView({
           />
         </Stack>
       </Stack>
-      <Card>
-        <CardContent>
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1 }}>
-            {tracker.calendarDays.map((day, index) => (
-              <Tooltip
-                arrow
-                disableHoverListener={
-                  !day.mark && day.entries.length === 0 && day.breaks.length === 0
-                }
-                key={day.date}
-                title={<CalendarDayTooltip day={day} />}
+      <Card sx={{ borderRadius: "10px", overflow: "hidden" }}>
+        <CardContent sx={{ p: { xs: 1, md: 1.5 } }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) 280px" },
+              gap: { xs: 1.5, md: 1.75 },
+            }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                  gap: 0.55,
+                  mb: 0.65,
+                }}
               >
-                <Box
-                  component={motion.button}
-                  type="button"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.96 }}
-                  transition={{ delay: index * 0.012 }}
-                  onClick={(event) => openDay(event, day.date)}
-                  sx={{
-                    aspectRatio: "1",
-                    minHeight: 54,
-                    borderRadius: "12px",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 0.3,
-                    bgcolor:
-                      day.status === "excluded"
-                        ? "#f8fafc"
-                        : day.status === "medical_leave"
-                          ? "#fff1f2"
-                        : day.status === "holiday"
-                        ? "#f5f3ff"
-                        : day.status === "empty"
-                          ? "#fffaf3"
-                          : "#ffffff",
-                    border: `2px solid ${colors[day.status]}`,
-                    color: day.status === "empty" ? "text.secondary" : "text.primary",
-                    position: "relative",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    font: "inherit",
-                    p: 0.5,
-                    boxShadow:
-                      day.status === "empty"
-                        ? "inset 0 0 0 1px rgba(36, 50, 40, 0.03)"
-                        : "0 7px 18px rgba(64, 42, 12, 0.08)",
-                    "&:hover": {
-                      bgcolor: "#ffffff",
-                      boxShadow: "0 12px 28px rgba(64, 42, 12, 0.16)",
-                      transform: "translateY(-1px)",
-                    },
-                  }}
-                >
-                  <Typography variant="caption" sx={{ fontWeight: 900, lineHeight: 1 }}>
-                    {formatWeekdayShortPtBr(day.date)}
-                  </Typography>
-                  <Typography sx={{ fontWeight: 900, lineHeight: 1 }}>
-                    {day.day}
-                  </Typography>
-                  {day.mark?.type === "holiday" && (
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: "#6d28d9",
-                        fontSize: "0.56rem",
-                        fontWeight: 900,
-                        lineHeight: 1,
-                      }}
-                    >
-                      FER
-                    </Typography>
-                  )}
-                  {day.mark?.type === "excluded" && (
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: "#475569",
-                        fontSize: "0.56rem",
-                        fontWeight: 900,
-                        lineHeight: 1,
-                      }}
-                    >
-                      LIMPO
-                    </Typography>
-                  )}
-                  {day.mark?.type === "medical_leave" && (
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: "#be123c",
-                        fontSize: "0.56rem",
-                        fontWeight: 900,
-                        lineHeight: 1,
-                      }}
-                    >
-                      MED
-                    </Typography>
-                  )}
+                {calendarWeekdayLabels.map((label) => (
                   <Box
+                    key={label}
                     sx={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      bgcolor: colors[day.status],
-                      position: "absolute",
-                      bottom: 7,
+                      borderRadius: "8px",
+                      bgcolor: "#f4f2ee",
+                      py: 0.75,
+                      textAlign: "center",
                     }}
-                  />
-                </Box>
-              </Tooltip>
-            ))}
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: "#44403c" }}>
+                      {label}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                  gap: 0.55,
+                }}
+              >
+                {paddedCalendarCells.map((day, index) => {
+                  if (!day) {
+                    return (
+                      <Box
+                        key={`empty-${index}`}
+                        sx={{
+                          minHeight: { xs: 62, md: 92 },
+                          borderRadius: "8px",
+                          bgcolor: "rgba(244, 242, 238, 0.38)",
+                        }}
+                      />
+                    );
+                  }
+
+                  const tone = getCalendarCellTone(day);
+                  const hasSummary =
+                    day.entries.length > 0 ||
+                    day.breaks.length > 0 ||
+                    Boolean(day.mark);
+
+                  return (
+                    <Tooltip
+                      arrow
+                      disableHoverListener={!hasSummary}
+                      key={day.date}
+                      title={<CalendarDayTooltip day={day} />}
+                    >
+                      <Box
+                        component={motion.button}
+                        type="button"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ delay: index * 0.006 }}
+                        onClick={(event) => openDay(event, day.date)}
+                        sx={{
+                          minHeight: { xs: 62, md: 92 },
+                          borderRadius: "8px",
+                          border: `1px solid ${tone.border}`,
+                          bgcolor: tone.bg,
+                          color: "text.primary",
+                          cursor: "pointer",
+                          font: "inherit",
+                          p: { xs: 0.55, md: 0.8 },
+                          textAlign: "left",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          boxShadow: hasSummary
+                            ? "0 8px 20px rgba(64, 42, 12, 0.07)"
+                            : "none",
+                          "&:hover": {
+                            boxShadow: "0 12px 28px rgba(64, 42, 12, 0.12)",
+                          },
+                        }}
+                      >
+                        <Stack
+                          direction="row"
+                          sx={{ alignItems: "center", justifyContent: "space-between", gap: 0.5 }}
+                        >
+                          <Typography sx={{ fontWeight: 900, fontSize: "0.8rem" }}>
+                            {day.day}
+                          </Typography>
+                          {tone.label && (
+                            <Box
+                              sx={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                bgcolor: tone.accent,
+                                flexShrink: 0,
+                              }}
+                            />
+                          )}
+                        </Stack>
+                        {hasSummary && (
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: tone.accent,
+                                display: "block",
+                                fontWeight: 900,
+                                lineHeight: 1.1,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {tone.label}
+                            </Typography>
+                            <Chip
+                              label={minutesToHoursLabel(day.workedMinutes)}
+                              size="small"
+                              sx={{
+                                borderRadius: "6px",
+                                bgcolor: tone.chip,
+                                color: tone.accent,
+                                fontWeight: 900,
+                                height: 22,
+                                mt: 0.55,
+                                maxWidth: "100%",
+                              }}
+                            />
+                          </Box>
+                        )}
+                      </Box>
+                    </Tooltip>
+                  );
+                })}
+              </Box>
+            </Box>
+            <CalendarSidebar
+              days={sidebarDays}
+              onOpenDay={(event, date) => openDay(event, date)}
+            />
           </Box>
         </CardContent>
       </Card>
@@ -1009,6 +1108,133 @@ function CalendarView({
       </Popover>
       <Legend />
     </Stack>
+  );
+}
+
+function CalendarSidebar({
+  days,
+  onOpenDay,
+}: {
+  days: CalendarDayItem[];
+  onOpenDay: (event: MouseEvent<HTMLElement>, date: string) => void;
+}) {
+  return (
+    <Box
+      sx={{
+        borderRadius: "10px",
+        bgcolor: "#f7f6f3",
+        border: `1px solid ${nanaColors.line}`,
+        p: 1.2,
+        maxHeight: { md: 560 },
+        overflowY: "auto",
+      }}
+    >
+      <Stack spacing={1.1}>
+        <Box sx={{ px: 0.25 }}>
+          <Typography sx={{ fontWeight: 900 }}>Destaques do mês</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Feriados, saldos e pendências
+          </Typography>
+        </Box>
+        {days.length === 0 ? (
+          <Alert severity="success" sx={{ borderRadius: "8px" }}>
+            Nenhum ponto de atenção neste mês.
+          </Alert>
+        ) : (
+          days.map((day, index) => {
+            const tone = getCalendarCellTone(day);
+            const canCloseDay = canCloseEntriesDirectly(day.entries);
+
+            return (
+              <Box
+                component={motion.button}
+                key={`calendar-sidebar-${day.date}`}
+                type="button"
+                initial={{ opacity: 0, x: 12 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                whileHover={{ x: 3 }}
+                whileTap={{ scale: 0.98 }}
+                viewport={{ once: false, amount: 0.45 }}
+                transition={{ duration: 0.2, delay: Math.min(index * 0.025, 0.12) }}
+                onClick={(event) => onOpenDay(event, day.date)}
+                sx={{
+                  border: `1px solid ${tone.border}`,
+                  borderRadius: "8px",
+                  bgcolor: "#ffffff",
+                  cursor: "pointer",
+                  font: "inherit",
+                  p: 1,
+                  textAlign: "left",
+                  width: "100%",
+                  boxShadow: "0 8px 18px rgba(64, 42, 12, 0.06)",
+                }}
+              >
+                <Stack spacing={0.9}>
+                  <Stack
+                    direction="row"
+                    sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}
+                  >
+                    <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: tone.accent,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                        {formatDatePtBr(day.date)}
+                      </Typography>
+                    </Stack>
+                    <Chip
+                      label={tone.label}
+                      size="small"
+                      sx={{
+                        borderRadius: "6px",
+                        bgcolor: tone.chip,
+                        color: tone.accent,
+                        fontWeight: 900,
+                      }}
+                    />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    {day.mark?.note ?? statusLabels[day.dayStatus]}
+                  </Typography>
+                  <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75 }}>
+                    <Chip
+                      label={minutesToHoursLabel(day.workedMinutes)}
+                      size="small"
+                      sx={{ borderRadius: "6px", bgcolor: "#f8fafc" }}
+                    />
+                    {day.balanceMinutes !== 0 && (
+                      <Chip
+                        label={`Saldo ${minutesToHoursLabel(day.balanceMinutes)}`}
+                        size="small"
+                        sx={{
+                          borderRadius: "6px",
+                          bgcolor: day.balanceMinutes < 0 ? "#fff1f2" : "#ecfdf5",
+                          color: day.balanceMinutes < 0 ? "#dc2626" : "#047857",
+                          fontWeight: 900,
+                        }}
+                      />
+                    )}
+                    {canCloseDay && (
+                      <Chip
+                        label="Encerrar"
+                        size="small"
+                        sx={{ borderRadius: "6px", bgcolor: "#ffedd5", color: "#c2410c" }}
+                      />
+                    )}
+                  </Stack>
+                </Stack>
+              </Box>
+            );
+          })
+        )}
+      </Stack>
+    </Box>
   );
 }
 
