@@ -1277,27 +1277,18 @@ function CalendarSidebar({
                     direction="row"
                     sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}
                   >
-                    <Stack spacing={0.15} sx={{ minWidth: 0 }}>
-                      <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: "50%",
-                            bgcolor: balanceIndicator?.accent ?? tone.accent,
-                            flexShrink: 0,
-                          }}
-                        />
-                        <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
-                          {formatDatePtBr(day.date)}
-                        </Typography>
-                      </Stack>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontWeight: 800, lineHeight: 1.1 }}
-                      >
-                        {formatWeekdayLongPtBr(day.date)}
+                    <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: balanceIndicator?.accent ?? tone.accent,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                        {formatDatePtBr(day.date)}
                       </Typography>
                     </Stack>
                     <Chip
@@ -1778,6 +1769,66 @@ function DayPopoverContent({
             />
           </Box>
 
+          {canCloseDay && (
+            <Box
+              component={motion.div}
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              whileHover={{ y: -2, boxShadow: "0 14px 30px rgba(194, 65, 12, 0.16)" }}
+              viewport={{ once: false, amount: 0.7 }}
+              transition={{ duration: 0.2 }}
+              sx={{
+                borderRadius: "10px",
+                border: "1px solid #fed7aa",
+                bgcolor: "#fff7ed",
+                p: 1.25,
+              }}
+            >
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                sx={{ gap: 1.2, alignItems: { xs: "stretch", sm: "center" } }}
+              >
+                <Box
+                  sx={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: "9px",
+                    display: { xs: "none", sm: "grid" },
+                    placeItems: "center",
+                    bgcolor: "#ffedd5",
+                    color: "#c2410c",
+                    flexShrink: 0,
+                  }}
+                >
+                  <AccessTimeRoundedIcon fontSize="small" />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                    Encerrar expediente
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Registra a saÃ­da desta data e tira o dia do estado pendente.
+                  </Typography>
+                </Box>
+                <Button
+                  color="warning"
+                  onClick={closeDayDirectly}
+                  size="small"
+                  startIcon={<AccessTimeRoundedIcon fontSize="small" />}
+                  sx={{
+                    borderRadius: "8px",
+                    fontWeight: 900,
+                    px: 1.4,
+                    whiteSpace: "nowrap",
+                  }}
+                  variant="contained"
+                >
+                  Encerrar dia
+                </Button>
+              </Stack>
+            </Box>
+          )}
+
           <Box
             component={motion.div}
             initial={{ opacity: 0, y: 10 }}
@@ -1909,17 +1960,6 @@ function DayPopoverContent({
                 >
                   Pausa
                 </Button>
-                {canCloseDay && (
-                  <Button
-                    color="warning"
-                    onClick={closeDayDirectly}
-                    size="small"
-                    sx={{ borderRadius: "8px", whiteSpace: "nowrap" }}
-                    variant="outlined"
-                  >
-                    Encerrar
-                  </Button>
-                )}
               </Stack>
             </Stack>
           </Box>
