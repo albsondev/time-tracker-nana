@@ -199,6 +199,7 @@ export function NanaPointApp() {
   const [authLoading, setAuthLoading] = useState(() => hasSupabaseConfig());
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
   const [breakDialogOpen, setBreakDialogOpen] = useState(false);
+  const [directCloseDialogOpen, setDirectCloseDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [addTarget, setAddTarget] = useState<AddRecordTarget | null>(null);
   const shouldReduceMotion = useReducedMotion();
@@ -299,6 +300,7 @@ export function NanaPointApp() {
                 tracker={tracker}
                 onOpenEntry={() => setEntryDialogOpen(true)}
                 onOpenBreak={() => setBreakDialogOpen(true)}
+                onOpenDirectClose={() => setDirectCloseDialogOpen(true)}
                 transition={transition}
               />
             )}
@@ -348,6 +350,12 @@ export function NanaPointApp() {
         onClose={() => setBreakDialogOpen(false)}
         date={tracker.todayKey}
         onSubmit={tracker.addBreak}
+      />
+      <DirectCloseDayDialog
+        open={directCloseDialogOpen}
+        date={tracker.todayKey}
+        onClose={() => setDirectCloseDialogOpen(false)}
+        onSubmit={tracker.addTimeEntry}
       />
       <EditRecordDialog
         target={editTarget}
@@ -582,11 +590,13 @@ function TodayView({
   tracker,
   onOpenEntry,
   onOpenBreak,
+  onOpenDirectClose,
   transition,
 }: {
   tracker: ReturnType<typeof useTimeTracker>;
   onOpenEntry: () => void;
   onOpenBreak: () => void;
+  onOpenDirectClose: () => void;
   transition: object;
 }) {
   const summary = tracker.todaySummary;
@@ -607,6 +617,8 @@ function TodayView({
   const bankLabel = tracker.hasHourBankMovements
     ? minutesToHoursLabel(tracker.hourBankBalance)
     : "Sem saldo";
+  const showDirectClose =
+    tracker.canCloseDayDirectly && tracker.nextEntryType !== "departure";
 
   return (
     <motion.section variants={staggerContainer} initial="hidden" animate="visible">
@@ -644,6 +656,20 @@ function TodayView({
                 >
                   {tracker.state === "loading" ? "Salvando..." : buttonLabel}
                 </Button>
+                {showDirectClose && (
+                  <Button
+                    size="large"
+                    color="warning"
+                    variant="outlined"
+                    disabled={tracker.state === "loading"}
+                    onClick={onOpenDirectClose}
+                    component={motion.button}
+                    whileTap={{ scale: 0.97 }}
+                    sx={{ minWidth: 116 }}
+                  >
+                    Encerrar
+                  </Button>
+                )}
                 <Button
                   size="large"
                   color="secondary"
@@ -3373,6 +3399,63 @@ function BreakDialog({
         <Button onClick={onClose}>Cancelar</Button>
         <Button variant="contained" onClick={submit}>
           Registrar pausa
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function DirectCloseDayDialog({
+  open,
+  date,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  date: string;
+  onClose: () => void;
+  onSubmit: (type: TimeEntry["type"], occurredAt: string, note?: string) => Promise<void>;
+}) {
+  const [time, setTime] = useState(() => new Date().toTimeString().slice(0, 5));
+  const [note, setNote] = useState("Encerramento direto do expediente");
+
+  function submit() {
+    void onSubmit(
+      "departure",
+      new Date(`${date}T${time}:00`).toISOString(),
+      note || undefined,
+    ).then(onClose);
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Encerrar expediente?</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Alert severity="warning">
+            Isso vai fechar o dia neste horário, sem exigir saída para almoço ou
+            retorno. Use quando a jornada já puder ser encerrada.
+          </Alert>
+          <TextField
+            label="Horário de encerramento"
+            type="time"
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            fullWidth
+          />
+          <TextField
+            label="Observação opcional"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            fullWidth
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button color="warning" variant="contained" onClick={submit}>
+          Confirmar encerramento
         </Button>
       </DialogActions>
     </Dialog>

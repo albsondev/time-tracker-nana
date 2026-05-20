@@ -155,6 +155,17 @@ function inferNextAction(entries: TimeEntry[], breaks: BreakEntry[]) {
   return getNextEntryType(baseStatus);
 }
 
+function canCloseDayDirectly(entries: TimeEntry[], breaks: BreakEntry[]) {
+  const summary = summarizeDay({
+    date: toDateKey(new Date()),
+    entries,
+    breaks,
+    now: new Date(),
+  });
+
+  return summary.status === "working";
+}
+
 export function useTimeTracker(params: {
   supabase: SupabaseClient | null;
   userId: string | null;
@@ -559,6 +570,7 @@ export function useTimeTracker(params: {
     resetCalendarMonth,
     hourBankBalance,
     nextEntryType: inferNextAction(todayEntries, todayBreaks),
+    canCloseDayDirectly: canCloseDayDirectly(todayEntries, todayBreaks),
     state,
     error,
     reload,
