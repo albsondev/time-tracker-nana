@@ -1227,7 +1227,12 @@ function CalendarSidebar({
         ) : (
           days.map((day, index) => {
             const tone = getCalendarCellTone(day);
+            const balanceIndicator = getCalendarBalanceIndicator(day);
             const canCloseDay = canCloseEntriesDirectly(day.entries);
+            const headerBg =
+              day.balanceMinutes !== 0 && !day.mark && day.status !== "pending"
+                ? "#fafafa"
+                : tone.chip;
 
             return (
               <Box
@@ -1243,59 +1248,145 @@ function CalendarSidebar({
                 onClick={(event) => onOpenDay(event, day.date)}
                 sx={{
                   border: `1px solid ${tone.border}`,
-                  borderRadius: "8px",
+                  borderRadius: "10px",
                   bgcolor: "#ffffff",
+                  boxShadow: "0 10px 24px rgba(64, 42, 12, 0.07)",
                   cursor: "pointer",
                   boxSizing: "border-box",
                   display: "block",
                   font: "inherit",
                   maxWidth: "100%",
-                  p: 1,
+                  overflow: "hidden",
+                  p: 0,
                   textAlign: "left",
                   width: "100%",
-                  boxShadow: "0 8px 18px rgba(64, 42, 12, 0.06)",
+                  "&:hover": {
+                    boxShadow: "0 14px 30px rgba(64, 42, 12, 0.11)",
+                  },
                 }}
               >
-                <Stack spacing={0.9}>
+                <Box
+                  sx={{
+                    bgcolor: headerBg,
+                    borderBottom: `1px solid ${tone.border}`,
+                    px: 1,
+                    py: 0.85,
+                  }}
+                >
                   <Stack
                     direction="row"
                     sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}
                   >
-                    <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          bgcolor: tone.accent,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
-                        {formatDatePtBr(day.date)}
+                    <Stack spacing={0.15} sx={{ minWidth: 0 }}>
+                      <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            bgcolor: balanceIndicator?.accent ?? tone.accent,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                          {formatDatePtBr(day.date)}
+                        </Typography>
+                      </Stack>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ fontWeight: 800, lineHeight: 1.1 }}
+                      >
+                        {formatWeekdayLongPtBr(day.date)}
                       </Typography>
                     </Stack>
                     <Chip
                       label={tone.label}
                       size="small"
                       sx={{
-                        borderRadius: "6px",
-                        bgcolor: tone.chip,
+                        borderRadius: "7px",
+                        bgcolor: "#ffffff",
                         color: tone.accent,
+                        flexShrink: 0,
                         fontWeight: 900,
+                        boxShadow: `inset 0 0 0 1px ${tone.border}`,
                       }}
                     />
                   </Stack>
-                  <Typography variant="body2" color="text.secondary">
+                </Box>
+                <Box sx={{ px: 1, py: 0.95 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: "#4b5563",
+                      fontWeight: 700,
+                      lineHeight: 1.35,
+                    }}
+                  >
                     {day.mark?.note ?? statusLabels[day.dayStatus]}
                   </Typography>
-                  <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75 }}>
-                    <Chip
-                      label={minutesToHoursLabel(day.workedMinutes)}
-                      size="small"
-                      sx={{ borderRadius: "6px", bgcolor: "#f8fafc" }}
-                    />
-                    {day.balanceMinutes !== 0 && (
+                </Box>
+                <Divider />
+                <Stack
+                  direction="row"
+                  sx={{
+                    alignItems: "center",
+                    bgcolor: "#f8fafc",
+                    gap: 0.75,
+                    justifyContent: "space-between",
+                    px: 1,
+                    py: 0.85,
+                  }}
+                >
+                  <Chip
+                    label={`Jornada ${minutesToHoursLabel(day.workedMinutes)}`}
+                    size="small"
+                    sx={{
+                      borderRadius: "7px",
+                      bgcolor: "#ffffff",
+                      color: "#475569",
+                      fontWeight: 900,
+                      maxWidth: "48%",
+                    }}
+                  />
+                  <Stack
+                    direction="row"
+                    spacing={0.6}
+                    sx={{
+                      alignItems: "center",
+                      flexShrink: 0,
+                      justifyContent: "flex-end",
+                      minWidth: 0,
+                    }}
+                  >
+                    {balanceIndicator && (
+                      <Box
+                        sx={{
+                          alignItems: "center",
+                          bgcolor: balanceIndicator.bg,
+                          border: `1px solid ${balanceIndicator.border}`,
+                          borderRadius: "999px",
+                          color: balanceIndicator.accent,
+                          display: "inline-flex",
+                          gap: 0.35,
+                          px: 0.75,
+                          py: 0.35,
+                        }}
+                      >
+                        {balanceIndicator.direction === "up" ? (
+                          <TrendingUpRoundedIcon sx={{ fontSize: 15 }} />
+                        ) : (
+                          <TrendingDownRoundedIcon sx={{ fontSize: 15 }} />
+                        )}
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "inherit", fontWeight: 900, lineHeight: 1 }}
+                        >
+                          {balanceIndicator.label}
+                        </Typography>
+                      </Box>
+                    )}
+                    {!balanceIndicator && day.balanceMinutes !== 0 && (
                       <Chip
                         label={`Saldo ${minutesToHoursLabel(day.balanceMinutes)}`}
                         size="small"
