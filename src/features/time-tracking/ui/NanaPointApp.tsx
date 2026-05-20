@@ -749,6 +749,10 @@ function getCalendarLeadingSlots(date: Date) {
   return weekDay === 0 ? 6 : weekDay - 1;
 }
 
+function hasCalendarDayActivity(day: CalendarDayItem) {
+  return day.entries.length > 0 || day.breaks.length > 0 || Boolean(day.mark);
+}
+
 function getCalendarCellTone(day: CalendarDayItem) {
   if (day.mark?.type === "medical_leave") {
     return { label: "Atestado", bg: "#fff1f2", border: "#fecdd3", accent: "#be123c", chip: "#ffe4e6" };
@@ -760,6 +764,14 @@ function getCalendarCellTone(day: CalendarDayItem) {
 
   if (day.mark?.type === "excluded") {
     return { label: "Limpo", bg: "#f8fafc", border: "#cbd5e1", accent: "#475569", chip: "#f1f5f9" };
+  }
+
+  if (!hasCalendarDayActivity(day)) {
+    if (day.status === "today") {
+      return { label: "Hoje", bg: "#fff7ed", border: "#fed7aa", accent: "#f57c00", chip: "#ffedd5" };
+    }
+
+    return { label: "", bg: "#f7f6f3", border: "#efebe4", accent: "#64748b", chip: "#ffffff" };
   }
 
   if (day.status === "pending") {
@@ -782,6 +794,10 @@ function getCalendarCellTone(day: CalendarDayItem) {
 }
 
 function shouldShowCalendarSidebarDay(day: CalendarDayItem) {
+  if (!hasCalendarDayActivity(day)) {
+    return false;
+  }
+
   return (
     day.mark?.type === "holiday" ||
     day.mark?.type === "medical_leave" ||
@@ -1067,7 +1083,9 @@ function CalendarView({
               </Box>
             </Box>
             <CalendarSidebar
+              key={`${tracker.calendarMonth.getFullYear()}-${tracker.calendarMonth.getMonth()}`}
               days={sidebarDays}
+              month={tracker.calendarMonth}
               onOpenDay={(event, date) => openDay(event, date)}
             />
           </Box>
@@ -1113,11 +1131,15 @@ function CalendarView({
 
 function CalendarSidebar({
   days,
+  month,
   onOpenDay,
 }: {
   days: CalendarDayItem[];
+  month: Date;
   onOpenDay: (event: MouseEvent<HTMLElement>, date: string) => void;
 }) {
+  const monthLabel = formatMonthPtBr(month);
+
   return (
     <Box
       sx={{
@@ -1126,19 +1148,20 @@ function CalendarSidebar({
         border: `1px solid ${nanaColors.line}`,
         p: 1.2,
         maxHeight: { md: 560 },
+        overflowX: "hidden",
         overflowY: "auto",
       }}
     >
-      <Stack spacing={1.1}>
+      <Stack spacing={1.1} sx={{ minWidth: 0 }}>
         <Box sx={{ px: 0.25 }}>
           <Typography sx={{ fontWeight: 900 }}>Destaques do mês</Typography>
           <Typography variant="body2" color="text.secondary">
-            Feriados, saldos e pendências
+            {monthLabel} · feriados, saldos e pendências
           </Typography>
         </Box>
         {days.length === 0 ? (
           <Alert severity="success" sx={{ borderRadius: "8px" }}>
-            Nenhum ponto de atenção neste mês.
+            Nenhum ponto de atenção em {monthLabel}.
           </Alert>
         ) : (
           days.map((day, index) => {
@@ -1162,7 +1185,10 @@ function CalendarSidebar({
                   borderRadius: "8px",
                   bgcolor: "#ffffff",
                   cursor: "pointer",
+                  boxSizing: "border-box",
+                  display: "block",
                   font: "inherit",
+                  maxWidth: "100%",
                   p: 1,
                   textAlign: "left",
                   width: "100%",
