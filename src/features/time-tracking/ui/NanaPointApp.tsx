@@ -1910,16 +1910,16 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
           const isCredit = movement.minutesDelta >= 0;
           const tone = isCredit
             ? {
-                border: "#a7f3d0",
-                header: "#ecfdf5",
-                headerActive: "#d1fae5",
+                border: "#e2e8f0",
+                header: "#f8fafc",
+                headerActive: "#f1f5f9",
                 text: "#047857",
                 chip: "#dcfce7",
               }
             : {
-                border: "#fed7aa",
-                header: "#fff7ed",
-                headerActive: "#ffedd5",
+                border: "#e2e8f0",
+                header: "#f8fafc",
+                headerActive: "#f1f5f9",
                 text: "#c2410c",
                 chip: "#ffedd5",
               };
@@ -2106,8 +2106,6 @@ function getHourBankDayTone(day: DailySummary) {
   if (day.mark?.type === "medical_leave") {
     return {
       label: "Atestado",
-      surface: "#fff1f2",
-      border: "#fecdd3",
       accent: "#be123c",
       badge: "#ffe4e6",
     };
@@ -2116,8 +2114,6 @@ function getHourBankDayTone(day: DailySummary) {
   if (day.mark?.type === "excluded") {
     return {
       label: "Limpo",
-      surface: "#f8fafc",
-      border: "#cbd5e1",
       accent: "#475569",
       badge: "#f1f5f9",
     };
@@ -2126,8 +2122,6 @@ function getHourBankDayTone(day: DailySummary) {
   if (day.mark?.type === "holiday") {
     return {
       label: "Feriado",
-      surface: "#f5f3ff",
-      border: "#c4b5fd",
       accent: "#6d28d9",
       badge: "#ede9fe",
     };
@@ -2136,8 +2130,6 @@ function getHourBankDayTone(day: DailySummary) {
   if (hasRecords && day.status !== "closed") {
     return {
       label: "Pendente",
-      surface: "#fffbeb",
-      border: "#fde68a",
       accent: "#b45309",
       badge: "#fef3c7",
     };
@@ -2146,8 +2138,6 @@ function getHourBankDayTone(day: DailySummary) {
   if (day.balanceMinutes < 0) {
     return {
       label: "Débito",
-      surface: "#fff1f2",
-      border: "#fecdd3",
       accent: "#dc2626",
       badge: "#ffe4e6",
     };
@@ -2156,8 +2146,6 @@ function getHourBankDayTone(day: DailySummary) {
   if (day.balanceMinutes > 0) {
     return {
       label: "Crédito",
-      surface: "#ecfdf5",
-      border: "#a7f3d0",
       accent: "#047857",
       badge: "#dcfce7",
     };
@@ -2165,8 +2153,6 @@ function getHourBankDayTone(day: DailySummary) {
 
   return {
     label: hasRecords ? "Fechado" : "Sem registro",
-    surface: "#f8fafc",
-    border: "#dbeafe",
     accent: "#2563eb",
     badge: "#e0f2fe",
   };
@@ -2193,56 +2179,78 @@ function HourBankDayTile({ day, index }: { day: DailySummary; index: number }) {
       viewport={{ once: false, amount: 0.45 }}
       transition={{ duration: 0.2, delay: Math.min(index * 0.025, 0.12) }}
       sx={{
-        minHeight: 142,
-        border: `1px solid ${tone.border}`,
-        borderRadius: "8px",
-        bgcolor: tone.surface,
-        px: 1.25,
-        py: 1.15,
+        minHeight: 156,
+        border: "1px solid #e5e7eb",
+        borderRadius: "12px",
+        bgcolor: "#f5f5f5",
         display: "flex",
         flexDirection: "column",
-        gap: 1,
+        overflow: "hidden",
       }}
     >
-      <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 900, lineHeight: 1.15 }}>
-            {formatDatePtBr(day.date)}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {formatWeekdayLongPtBr(day.date)}
-          </Typography>
-        </Box>
-        <Chip
-          label={workedLabel}
-          size="small"
+      <Box sx={{ px: 1.4, py: 1.25, flex: 1 }}>
+        <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>
+              {formatWeekdayLongPtBr(day.date)}
+            </Typography>
+            <Typography sx={{ fontWeight: 900, lineHeight: 1.15, color: "#111827" }}>
+              {formatDatePtBr(day.date)}
+            </Typography>
+          </Box>
+          <Chip
+            label={workedLabel}
+            size="small"
+            sx={{
+              borderRadius: "8px",
+              bgcolor: "#ffffff",
+              color: "#374151",
+              flexShrink: 0,
+              fontWeight: 900,
+              boxShadow: "inset 0 0 0 1px #e5e7eb",
+            }}
+          />
+        </Stack>
+        <Typography
+          variant="body2"
           sx={{
-            borderRadius: "6px",
-            bgcolor: tone.badge,
-            color: tone.accent,
-            flexShrink: 0,
-            fontWeight: 900,
+            color: "#4b5563",
+            lineHeight: 1.4,
+            mt: 1.4,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
           }}
-        />
-      </Stack>
-      <Typography
-        variant="body2"
-        sx={{
-          color: "#334155",
-          lineHeight: 1.35,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          display: "-webkit-box",
-          WebkitLineClamp: 3,
-          WebkitBoxOrient: "vertical",
-        }}
-      >
-        {getHourBankDetailLabel(day)}
-      </Typography>
+        >
+          {getHourBankDetailLabel(day)}
+        </Typography>
+      </Box>
       <Stack
         direction="row"
-        sx={{ alignItems: "center", justifyContent: "space-between", gap: 1, mt: "auto" }}
+        sx={{
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1,
+          mt: "auto",
+          bgcolor: "#eeeeee",
+          borderTop: "1px solid #e5e7eb",
+          px: 1.4,
+          py: 0.95,
+        }}
       >
+        <Chip
+          label={tone.label}
+          size="small"
+          sx={{
+            borderRadius: "8px",
+            bgcolor: tone.badge,
+            color: tone.accent,
+            fontWeight: 900,
+            maxWidth: "54%",
+          }}
+        />
         <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
           <Box
             sx={{
@@ -2253,13 +2261,10 @@ function HourBankDayTile({ day, index }: { day: DailySummary; index: number }) {
               flexShrink: 0,
             }}
           />
-          <Typography variant="caption" sx={{ color: tone.accent, fontWeight: 900 }}>
-            {tone.label}
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>
+            {balanceLabel}
           </Typography>
         </Stack>
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>
-          {balanceLabel}
-        </Typography>
       </Stack>
     </Box>
   );
