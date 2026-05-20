@@ -769,6 +769,10 @@ function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
     return { label: "Limpo", bg: "#f8fafc", border: "#cbd5e1", accent: "#475569", chip: "#f1f5f9" };
   }
 
+  if (day.mark?.type === "completed") {
+    return { label: "Saldo semanal", bg: "#ffffff", border: "#eee9df", accent: "#047857", chip: "#dcfce7" };
+  }
+
   if (!hasCalendarDayActivity(day)) {
     if (day.status === "today") {
       return { label: "Hoje", bg: "#fff7ed", border: "#fed7aa", accent: "#f57c00", chip: "#ffedd5" };
@@ -807,6 +811,16 @@ function getCalendarBalanceIndicator(day: CalendarDayItem) {
     return null;
   }
 
+  if (day.mark?.type === "completed" && day.workedMinutes > 0) {
+    return {
+      direction: "up" as const,
+      label: `+${minutesToHoursLabel(day.workedMinutes)}`,
+      accent: "#10b981",
+      bg: "#ecfdf5",
+      border: "#a7f3d0",
+    };
+  }
+
   if (day.balanceMinutes > 0) {
     return {
       direction: "up" as const,
@@ -839,6 +853,7 @@ function shouldShowCalendarSidebarDay(day: CalendarDayItem) {
     day.mark?.type === "holiday" ||
     day.mark?.type === "medical_leave" ||
     day.mark?.type === "excluded" ||
+    day.mark?.type === "completed" ||
     day.status === "pending" ||
     day.balanceMinutes < 0 ||
     day.balanceMinutes > 0
