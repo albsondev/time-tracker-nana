@@ -2078,79 +2078,11 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
                             }}
                           >
                         {details.map((day, detailIndex) => (
-                          <Box
-                            component={motion.div}
+                          <HourBankDayTile
+                            day={day}
+                            index={detailIndex}
                             key={`${movement.id}-${day.date}`}
-                            initial={{ opacity: 0, y: 10 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            whileHover={{
-                              x: 3,
-                              boxShadow: "0 10px 24px rgba(36, 50, 40, 0.08)",
-                            }}
-                            viewport={{ once: false, amount: 0.45 }}
-                            transition={{
-                              duration: 0.2,
-                              delay: Math.min(detailIndex * 0.025, 0.12),
-                            }}
-                            sx={{
-                              border: `1px solid ${nanaColors.line}`,
-                              borderRadius: "8px",
-                              bgcolor: "#f8fafc",
-                              px: 1,
-                              py: 0.85,
-                            }}
-                          >
-                        <Stack
-                          direction="row"
-                          sx={{ justifyContent: "space-between", gap: 1.5 }}
-                        >
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontWeight: 900 }}>
-                              {formatDateFullPtBr(day.date)}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {getHourBankDetailLabel(day)}
-                            </Typography>
-                          </Box>
-                          {(day.mark?.type === "holiday" ||
-                            day.mark?.type === "excluded" ||
-                            day.mark?.type === "medical_leave") &&
-                          day.workedMinutes === 0 ? (
-                            <Chip
-                              label={
-                                day.mark.type === "excluded"
-                                  ? "limpo"
-                                  : day.mark.type === "medical_leave"
-                                    ? "atestado"
-                                    : "isento"
-                              }
-                              size="small"
-                              sx={{
-                                borderRadius: "6px",
-                                flexShrink: 0,
-                                bgcolor:
-                                  day.mark.type === "excluded"
-                                    ? "#f1f5f9"
-                                    : day.mark.type === "medical_leave"
-                                      ? "#fff1f2"
-                                      : "#f5f3ff",
-                                color:
-                                  day.mark.type === "excluded"
-                                    ? "#475569"
-                                    : day.mark.type === "medical_leave"
-                                      ? "#be123c"
-                                      : "#6d28d9",
-                              }}
-                            />
-                          ) : (
-                            <Chip
-                              label={minutesToHoursLabel(day.workedMinutes)}
-                              size="small"
-                              sx={{ borderRadius: "6px", flexShrink: 0 }}
-                            />
-                          )}
-                        </Stack>
-                          </Box>
+                          />
                         ))}
                           </Box>
                         </Stack>
@@ -2165,6 +2097,171 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
         })}
       </Stack>
     </Stack>
+  );
+}
+
+function getHourBankDayTone(day: DailySummary) {
+  const hasRecords = day.entries.length > 0 || day.breaks.length > 0;
+
+  if (day.mark?.type === "medical_leave") {
+    return {
+      label: "Atestado",
+      surface: "#fff1f2",
+      border: "#fecdd3",
+      accent: "#be123c",
+      badge: "#ffe4e6",
+    };
+  }
+
+  if (day.mark?.type === "excluded") {
+    return {
+      label: "Limpo",
+      surface: "#f8fafc",
+      border: "#cbd5e1",
+      accent: "#475569",
+      badge: "#f1f5f9",
+    };
+  }
+
+  if (day.mark?.type === "holiday") {
+    return {
+      label: "Feriado",
+      surface: "#f5f3ff",
+      border: "#c4b5fd",
+      accent: "#6d28d9",
+      badge: "#ede9fe",
+    };
+  }
+
+  if (hasRecords && day.status !== "closed") {
+    return {
+      label: "Pendente",
+      surface: "#fffbeb",
+      border: "#fde68a",
+      accent: "#b45309",
+      badge: "#fef3c7",
+    };
+  }
+
+  if (day.balanceMinutes < 0) {
+    return {
+      label: "Débito",
+      surface: "#fff1f2",
+      border: "#fecdd3",
+      accent: "#dc2626",
+      badge: "#ffe4e6",
+    };
+  }
+
+  if (day.balanceMinutes > 0) {
+    return {
+      label: "Crédito",
+      surface: "#ecfdf5",
+      border: "#a7f3d0",
+      accent: "#047857",
+      badge: "#dcfce7",
+    };
+  }
+
+  return {
+    label: hasRecords ? "Fechado" : "Sem registro",
+    surface: "#f8fafc",
+    border: "#dbeafe",
+    accent: "#2563eb",
+    badge: "#e0f2fe",
+  };
+}
+
+function HourBankDayTile({ day, index }: { day: DailySummary; index: number }) {
+  const tone = getHourBankDayTone(day);
+  const balanceLabel =
+    day.balanceMinutes === 0 ? "Saldo 0min" : `Saldo ${minutesToHoursLabel(day.balanceMinutes)}`;
+  const workedLabel =
+    (day.mark?.type === "holiday" ||
+      day.mark?.type === "excluded" ||
+      day.mark?.type === "medical_leave") &&
+    day.workedMinutes === 0
+      ? tone.label
+      : minutesToHoursLabel(day.workedMinutes);
+
+  return (
+    <Box
+      component={motion.article}
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2, boxShadow: "0 14px 28px rgba(36, 50, 40, 0.10)" }}
+      viewport={{ once: false, amount: 0.45 }}
+      transition={{ duration: 0.2, delay: Math.min(index * 0.025, 0.12) }}
+      sx={{
+        minHeight: 142,
+        border: `1px solid ${tone.border}`,
+        borderRadius: "8px",
+        bgcolor: tone.surface,
+        px: 1.25,
+        py: 1.15,
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+      }}
+    >
+      <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 900, lineHeight: 1.15 }}>
+            {formatDatePtBr(day.date)}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {formatWeekdayLongPtBr(day.date)}
+          </Typography>
+        </Box>
+        <Chip
+          label={workedLabel}
+          size="small"
+          sx={{
+            borderRadius: "6px",
+            bgcolor: tone.badge,
+            color: tone.accent,
+            flexShrink: 0,
+            fontWeight: 900,
+          }}
+        />
+      </Stack>
+      <Typography
+        variant="body2"
+        sx={{
+          color: "#334155",
+          lineHeight: 1.35,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          display: "-webkit-box",
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: "vertical",
+        }}
+      >
+        {getHourBankDetailLabel(day)}
+      </Typography>
+      <Stack
+        direction="row"
+        sx={{ alignItems: "center", justifyContent: "space-between", gap: 1, mt: "auto" }}
+      >
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              bgcolor: tone.accent,
+              flexShrink: 0,
+            }}
+          />
+          <Typography variant="caption" sx={{ color: tone.accent, fontWeight: 900 }}>
+            {tone.label}
+          </Typography>
+        </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>
+          {balanceLabel}
+        </Typography>
+      </Stack>
+    </Box>
   );
 }
 
