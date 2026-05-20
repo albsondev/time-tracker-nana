@@ -785,11 +785,11 @@ function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
   }
 
   if (day.balanceMinutes < 0) {
-    return { label: "Negativo", bg: "#fff1f2", border: "#fecdd3", accent: "#dc2626", chip: "#ffe4e6" };
+    return { label: "Negativo", bg: "#ffffff", border: "#eee9df", accent: "#dc2626", chip: "#ffe4e6" };
   }
 
   if (day.balanceMinutes > 0) {
-    return { label: "Crédito", bg: "#ecfdf5", border: "#a7f3d0", accent: "#047857", chip: "#dcfce7" };
+    return { label: "Crédito", bg: "#ffffff", border: "#eee9df", accent: "#047857", chip: "#dcfce7" };
   }
 
   if (day.status === "today") {
