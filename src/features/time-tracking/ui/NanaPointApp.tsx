@@ -1488,7 +1488,9 @@ function DayPopoverContent({
   const isMedicalLeave = day.mark?.type === "medical_leave";
   const isCompleted = day.mark?.type === "completed";
   const balanceLabel =
-    day.balanceMinutes === 0
+    isCompleted
+      ? `+${minutesToHoursLabel(day.workedMinutes)}`
+    : day.balanceMinutes === 0
       ? "0min"
       : minutesToHoursLabel(day.balanceMinutes);
   const statusColor =
@@ -1531,7 +1533,7 @@ function DayPopoverContent({
     : isMedicalLeave
       ? "Ausência justificada"
     : isCompleted
-      ? "Concluído sem alerta negativo no dia"
+      ? "Conta como saldo semanal"
     : day.balanceMinutes === 0
       ? "Sem saldo no dia"
       : `${balanceLabel} de saldo`;
@@ -1803,9 +1805,9 @@ function DayPopoverContent({
               value={workedLabel}
             />
             <PopoverMetric
-              color={day.balanceMinutes < 0 ? "#d97706" : "#4f46e5"}
-              label="Saldo"
-              surface={day.balanceMinutes < 0 ? "#fff7ed" : "#eef2ff"}
+              color={isCompleted ? "#047857" : day.balanceMinutes < 0 ? "#d97706" : "#4f46e5"}
+              label={isCompleted ? "Saldo semanal" : "Saldo"}
+              surface={isCompleted ? "#ecfdf5" : day.balanceMinutes < 0 ? "#fff7ed" : "#eef2ff"}
               value={balanceLabel}
             />
           </Box>
@@ -2647,6 +2649,14 @@ function getHourBankDayTone(day: DailySummary) {
     };
   }
 
+  if (day.mark?.type === "completed") {
+    return {
+      label: "Saldo semanal",
+      accent: "#047857",
+      badge: "#dcfce7",
+    };
+  }
+
   if (hasRecords && day.status !== "closed") {
     return {
       label: "Pendente",
@@ -2681,7 +2691,11 @@ function getHourBankDayTone(day: DailySummary) {
 function HourBankDayTile({ day, index }: { day: DailySummary; index: number }) {
   const tone = getHourBankDayTone(day);
   const balanceLabel =
-    day.balanceMinutes === 0 ? "Saldo 0min" : `Saldo ${minutesToHoursLabel(day.balanceMinutes)}`;
+    day.mark?.type === "completed"
+      ? `Saldo semanal +${minutesToHoursLabel(day.workedMinutes)}`
+      : day.balanceMinutes === 0
+        ? "Saldo 0min"
+        : `Saldo ${minutesToHoursLabel(day.balanceMinutes)}`;
   const workedLabel =
     (day.mark?.type === "holiday" ||
       day.mark?.type === "excluded" ||
@@ -2805,6 +2819,10 @@ function getHourBankDetailLabel(day: DailySummary) {
 
   if (day.mark?.type === "holiday" && day.entries.length === 0 && day.breaks.length === 0) {
     return "Feriado";
+  }
+
+  if (day.mark?.type === "completed") {
+    return `Dia concluÃ­do Â· ${minutesToHoursLabel(day.workedMinutes)} entram no saldo semanal`;
   }
 
   if (day.entries.length === 0 && day.breaks.length === 0) {
