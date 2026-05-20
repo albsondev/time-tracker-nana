@@ -1509,6 +1509,7 @@ function DayPopoverContent({
   const canCloseDay = canCloseEntriesDirectly(day.entries);
   const canCompleteWithoutDebit =
     hasRecords &&
+    day.dayStatus === "closed" &&
     day.balanceMinutes < 0 &&
     !isHoliday &&
     !isExcluded &&
@@ -1530,7 +1531,7 @@ function DayPopoverContent({
     : isMedicalLeave
       ? "Ausência justificada"
     : isCompleted
-      ? "Concluído sem débito no banco de horas"
+      ? "Concluído sem alerta negativo no dia"
     : day.balanceMinutes === 0
       ? "Sem saldo no dia"
       : `${balanceLabel} de saldo`;
@@ -1849,7 +1850,7 @@ function DayPopoverContent({
                   <Typography variant="body2" color="text.secondary">
                     {canCloseDay
                       ? "Registra a saída desta data e tira o dia do estado pendente."
-                      : "Mantém os horários reais, mas remove o débito deste dia no banco de horas."}
+                      : "Mantém os horários reais e remove o alerta negativo do dia; o banco segue pelo total semanal."}
                   </Typography>
                 </Box>
                 <Button

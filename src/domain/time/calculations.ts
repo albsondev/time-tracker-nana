@@ -81,6 +81,10 @@ function getExpectedMinutesForDay(day: Pick<DailySummary, "mark" | "workedMinute
   return DAILY_REFERENCE_MINUTES;
 }
 
+function getWeeklyExpectedMinutesForDay(day: Pick<DailySummary, "mark">) {
+  return isNonWorkingMark(day.mark) ? 0 : DAILY_REFERENCE_MINUTES;
+}
+
 function isExcludedDay(day: DailySummary) {
   return day.mark?.type === "excluded" || day.mark?.type === "medical_leave";
 }
@@ -181,7 +185,7 @@ export function summarizeWeek(params: {
     params.expectedMinutes ??
     Math.min(
       WEEKLY_EXPECTED_MINUTES,
-      params.days.reduce((total, day) => total + getExpectedMinutesForDay(day), 0),
+      params.days.reduce((total, day) => total + getWeeklyExpectedMinutesForDay(day), 0),
     );
   const workedMinutes = params.days.reduce(
     (total, day) => total + day.workedMinutes,
@@ -254,7 +258,7 @@ export function calculateAutomaticWeeklyBankMovements(
       );
       const weeklyExpectedMinutes = Math.min(
         expectedMinutes,
-        weekDetails.reduce((total, day) => total + getExpectedMinutesForDay(day), 0),
+        weekDetails.reduce((total, day) => total + getWeeklyExpectedMinutesForDay(day), 0),
       );
       const minutesDelta = workedMinutes - weeklyExpectedMinutes;
 

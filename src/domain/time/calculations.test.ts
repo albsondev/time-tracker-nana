@@ -349,51 +349,52 @@ describe("time calculations", () => {
     expect(movements[0].details?.at(4)?.workedMinutes).toBe(0);
   });
 
-  it("does not create weekly debit for a manually completed short day", () => {
+  it("credits all hours above 30 when a short Friday was manually completed", () => {
     const movements = calculateAutomaticWeeklyBankMovements(
       [
         summarizeDay({
           date: "2026-05-11",
           entries: [
             entry("1", "arrival", "2026-05-11T08:00:00-03:00"),
-            entry("2", "departure", "2026-05-11T12:30:00-03:00"),
+            entry("2", "departure", "2026-05-11T16:00:00-03:00"),
           ],
-          mark: mark("completed-1", "2026-05-11", "completed"),
         }),
         summarizeDay({
           date: "2026-05-12",
           entries: [
             entry("3", "arrival", "2026-05-12T08:00:00-03:00"),
-            entry("4", "departure", "2026-05-12T14:00:00-03:00"),
+            entry("4", "departure", "2026-05-12T16:00:00-03:00"),
           ],
         }),
         summarizeDay({
           date: "2026-05-13",
           entries: [
             entry("5", "arrival", "2026-05-13T08:00:00-03:00"),
-            entry("6", "departure", "2026-05-13T14:00:00-03:00"),
+            entry("6", "departure", "2026-05-13T16:00:00-03:00"),
           ],
         }),
         summarizeDay({
           date: "2026-05-14",
           entries: [
             entry("7", "arrival", "2026-05-14T08:00:00-03:00"),
-            entry("8", "departure", "2026-05-14T14:00:00-03:00"),
+            entry("8", "departure", "2026-05-14T16:00:00-03:00"),
           ],
         }),
         summarizeDay({
           date: "2026-05-15",
           entries: [
             entry("9", "arrival", "2026-05-15T08:00:00-03:00"),
-            entry("10", "departure", "2026-05-15T14:00:00-03:00"),
+            entry("10", "departure", "2026-05-15T12:30:00-03:00"),
           ],
+          mark: mark("completed-1", "2026-05-15", "completed"),
         }),
       ],
       undefined,
       new Date("2026-05-18T09:00:00-03:00"),
     );
 
-    expect(movements).toHaveLength(0);
+    expect(movements).toHaveLength(1);
+    expect(movements[0].minutesDelta).toBe(390);
   });
 
   it("does not create weekly debit when the missing day is a holiday", () => {
