@@ -619,6 +619,7 @@ function TodayView({
     : "Sem saldo";
   const showDirectClose =
     tracker.canCloseDayDirectly && tracker.nextEntryType !== "departure";
+  const primaryActionClosesDay = tracker.nextEntryType === "departure";
 
   return (
     <motion.section variants={staggerContainer} initial="hidden" animate="visible">
@@ -650,7 +651,7 @@ function TodayView({
                   size="large"
                   variant="contained"
                   disabled={!tracker.nextEntryType || tracker.state === "loading"}
-                  onClick={onOpenEntry}
+                  onClick={primaryActionClosesDay ? onOpenDirectClose : onOpenEntry}
                   component={motion.button}
                   whileTap={{ scale: 0.97 }}
                 >

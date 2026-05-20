@@ -162,8 +162,9 @@ function canCloseDayDirectly(entries: TimeEntry[], breaks: BreakEntry[]) {
     breaks,
     now: new Date(),
   });
+  const hasArrival = entries.some((entry) => entry.type === "arrival");
 
-  return summary.status === "working";
+  return hasArrival && summary.status !== "closed";
 }
 
 export function useTimeTracker(params: {

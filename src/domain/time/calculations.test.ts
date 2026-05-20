@@ -234,6 +234,21 @@ describe("time calculations", () => {
     expect(summary.workedMinutes).toBe(0);
   });
 
+  it("closes the day when departure is recorded before the lunch return", () => {
+    const summary = summarizeDay({
+      date: "2026-05-20",
+      entries: [
+        entry("1", "arrival", "2026-05-20T08:00:00-03:00"),
+        entry("2", "lunch_start", "2026-05-20T12:00:00-03:00"),
+        entry("3", "departure", "2026-05-20T12:00:00-03:00"),
+      ],
+    });
+
+    expect(summary.status).toBe("closed");
+    expect(summary.workedMinutes).toBe(240);
+    expect(summary.balanceMinutes).toBe(-120);
+  });
+
   it("creates automatic weekly hour bank credit above 30 hours", () => {
     const closedCredit = summarizeDay({
       date: "2026-05-05",
