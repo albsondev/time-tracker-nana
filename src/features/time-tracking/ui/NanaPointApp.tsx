@@ -1864,6 +1864,17 @@ function RecordMiniList({
 }
 
 function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> }) {
+  const [selectedMovementId, setSelectedMovementId] = useState<string | null | undefined>(
+    undefined,
+  );
+  const expandedMovementId =
+    selectedMovementId === undefined
+      ? tracker.movements[0]?.id ?? null
+      : selectedMovementId &&
+          tracker.movements.some((movement) => movement.id === selectedMovementId)
+        ? selectedMovementId
+        : null;
+
   return (
     <Stack spacing={2}>
       <SectionTitle title="Banco de horas" subtitle="Créditos e débitos semanais" />
@@ -1892,8 +1903,23 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
         </Alert>
       )}
       <Stack spacing={1.5}>
-        {tracker.movements.map((movement) => (
-          <Card key={movement.id}>
+        {tracker.movements.map((movement, index) => {
+          const details = movement.details ?? [];
+          const isExpanded = expandedMovementId === movement.id;
+          const detailsCount = details.length;
+
+          return (
+            <MotionCard
+              key={movement.id}
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              whileHover={{
+                y: -2,
+                boxShadow: "0 16px 36px rgba(64, 42, 12, 0.12)",
+              }}
+              viewport={{ once: false, amount: 0.18 }}
+              transition={{ duration: 0.24, delay: Math.min(index * 0.03, 0.18) }}
+            >
             <CardContent>
               <Stack spacing={1.4}>
                 <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
@@ -1923,22 +1949,69 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
                   <Chip
                     label={minutesToHoursLabel(movement.minutesDelta)}
                     color={movement.minutesDelta >= 0 ? "secondary" : "warning"}
-                    sx={{ borderRadius: "8px" }}
+                    sx={{ borderRadius: "8px", fontWeight: 900 }}
                   />
                 </Stack>
-                {movement.details && movement.details.length > 0 && (
-                  <Stack spacing={0.8}>
-                    {movement.details.map((day) => (
-                      <Box
-                        key={`${movement.id}-${day.date}`}
-                        sx={{
-                          border: `1px solid ${nanaColors.line}`,
-                          borderRadius: "8px",
-                          bgcolor: "#f8fafc",
-                          px: 1,
-                          py: 0.85,
-                        }}
+                {detailsCount > 0 && (
+                  <>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <Button
+                        aria-expanded={isExpanded}
+                        color="secondary"
+                        endIcon={
+                          <ExpandMoreRoundedIcon
+                            sx={{
+                              transform: isExpanded
+                                ? "rotate(180deg)"
+                                : "rotate(0deg)",
+                              transition: "transform 180ms ease",
+                            }}
+                          />
+                        }
+                        onClick={() =>
+                          setSelectedMovementId(isExpanded ? null : movement.id)
+                        }
+                        sx={{ borderRadius: "8px", px: 1.25 }}
+                        variant={isExpanded ? "contained" : "outlined"}
                       >
+                        {isExpanded ? "Ocultar detalhes" : "Ver detalhes"}
+                      </Button>
+                      <Chip
+                        label={`${detailsCount} dias`}
+                        size="small"
+                        sx={{
+                          borderRadius: "6px",
+                          bgcolor: "#f8fafc",
+                          color: "#475569",
+                        }}
+                      />
+                    </Stack>
+                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                      <Stack spacing={0.8} sx={{ pt: 0.4 }}>
+                        <Divider />
+                        {details.map((day, detailIndex) => (
+                          <Box
+                            component={motion.div}
+                            key={`${movement.id}-${day.date}`}
+                            initial={{ opacity: 0, y: 10 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            whileHover={{
+                              x: 3,
+                              boxShadow: "0 10px 24px rgba(36, 50, 40, 0.08)",
+                            }}
+                            viewport={{ once: false, amount: 0.45 }}
+                            transition={{
+                              duration: 0.2,
+                              delay: Math.min(detailIndex * 0.025, 0.12),
+                            }}
+                            sx={{
+                              border: `1px solid ${nanaColors.line}`,
+                              borderRadius: "8px",
+                              bgcolor: "#f8fafc",
+                              px: 1,
+                              py: 0.85,
+                            }}
+                          >
                         <Stack
                           direction="row"
                           sx={{ justifyContent: "space-between", gap: 1.5 }}
@@ -1989,14 +2062,17 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
                             />
                           )}
                         </Stack>
-                      </Box>
-                    ))}
-                  </Stack>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Collapse>
+                  </>
                 )}
               </Stack>
             </CardContent>
-          </Card>
-        ))}
+            </MotionCard>
+          );
+        })}
       </Stack>
     </Stack>
   );
