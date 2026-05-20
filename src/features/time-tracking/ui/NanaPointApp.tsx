@@ -193,13 +193,20 @@ function recordMatchesSearch(
   return haystack.includes(normalizedQuery);
 }
 
+function canCloseEntriesDirectly(entries: TimeEntry[]) {
+  const hasArrival = entries.some((entry) => entry.type === "arrival");
+  const hasDeparture = entries.some((entry) => entry.type === "departure");
+
+  return hasArrival && !hasDeparture;
+}
+
 export function NanaPointApp() {
   const [tab, setTab] = useState<Tab>("today");
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(() => hasSupabaseConfig());
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
   const [breakDialogOpen, setBreakDialogOpen] = useState(false);
-  const [directCloseDialogOpen, setDirectCloseDialogOpen] = useState(false);
+  const [directCloseDate, setDirectCloseDate] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [addTarget, setAddTarget] = useState<AddRecordTarget | null>(null);
   const shouldReduceMotion = useReducedMotion();
@@ -300,7 +307,7 @@ export function NanaPointApp() {
                 tracker={tracker}
                 onOpenEntry={() => setEntryDialogOpen(true)}
                 onOpenBreak={() => setBreakDialogOpen(true)}
-                onOpenDirectClose={() => setDirectCloseDialogOpen(true)}
+                onOpenDirectClose={() => setDirectCloseDate(tracker.todayKey)}
                 transition={transition}
               />
             )}
@@ -310,6 +317,7 @@ export function NanaPointApp() {
                 onAddBreak={(date) => setAddTarget({ kind: "break", date })}
                 onAddTime={(date) => setAddTarget({ kind: "time", date })}
                 onEdit={setEditTarget}
+                onOpenDirectClose={setDirectCloseDate}
                 onToggleHoliday={tracker.toggleHoliday}
                 onToggleExcludedDay={tracker.toggleExcludedDay}
                 onToggleMedicalLeave={tracker.toggleMedicalLeave}
@@ -322,6 +330,7 @@ export function NanaPointApp() {
                 onAddBreak={(date) => setAddTarget({ kind: "break", date })}
                 onAddTime={(date) => setAddTarget({ kind: "time", date })}
                 onEdit={setEditTarget}
+                onOpenDirectClose={setDirectCloseDate}
                 onToggleExcludedDay={tracker.toggleExcludedDay}
                 onToggleMedicalLeave={tracker.toggleMedicalLeave}
               />
@@ -352,9 +361,10 @@ export function NanaPointApp() {
         onSubmit={tracker.addBreak}
       />
       <DirectCloseDayDialog
-        open={directCloseDialogOpen}
-        date={tracker.todayKey}
-        onClose={() => setDirectCloseDialogOpen(false)}
+        key={directCloseDate ?? "direct-close-closed"}
+        open={Boolean(directCloseDate)}
+        date={directCloseDate ?? tracker.todayKey}
+        onClose={() => setDirectCloseDate(null)}
         onSubmit={tracker.addTimeEntry}
       />
       <EditRecordDialog
@@ -730,6 +740,7 @@ function CalendarView({
   onAddBreak,
   onAddTime,
   onEdit,
+  onOpenDirectClose,
   onToggleHoliday,
   onToggleExcludedDay,
   onToggleMedicalLeave,
@@ -738,6 +749,7 @@ function CalendarView({
   onAddBreak: (date: string) => void;
   onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
+  onOpenDirectClose: (date: string) => void;
   onToggleHoliday: (date: string) => Promise<void>;
   onToggleExcludedDay: (date: string) => Promise<void>;
   onToggleMedicalLeave: (date: string) => Promise<void>;
@@ -988,6 +1000,7 @@ function CalendarView({
             onAddTime={onAddTime}
             onEdit={onEdit}
             onAfterEdit={closeDay}
+            onOpenDirectClose={onOpenDirectClose}
             onToggleHoliday={onToggleHoliday}
             onToggleExcludedDay={onToggleExcludedDay}
             onToggleMedicalLeave={onToggleMedicalLeave}
@@ -1051,6 +1064,7 @@ function DayPopoverContent({
   onAddTime,
   onEdit,
   onAfterEdit,
+  onOpenDirectClose,
   onToggleHoliday,
   onToggleExcludedDay,
   onToggleMedicalLeave,
@@ -1060,6 +1074,7 @@ function DayPopoverContent({
   onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
   onAfterEdit: () => void;
+  onOpenDirectClose: (date: string) => void;
   onToggleHoliday: (date: string) => Promise<void>;
   onToggleExcludedDay: (date: string) => Promise<void>;
   onToggleMedicalLeave: (date: string) => Promise<void>;
@@ -1085,6 +1100,7 @@ function DayPopoverContent({
         ? "#d97706"
         : "#2563eb";
   const recordCount = day.entries.length + day.breaks.length;
+  const canCloseDay = canCloseEntriesDirectly(day.entries);
   const dayStatusLabel = isExcluded
     ? "Dia limpo"
     : isMedicalLeave
@@ -1114,6 +1130,11 @@ function DayPopoverContent({
 
   function addBreak() {
     onAddBreak(day.date);
+    onAfterEdit();
+  }
+
+  function closeDayDirectly() {
+    onOpenDirectClose(day.date);
     onAfterEdit();
   }
 
@@ -1484,6 +1505,17 @@ function DayPopoverContent({
                 >
                   Pausa
                 </Button>
+                {canCloseDay && (
+                  <Button
+                    color="warning"
+                    onClick={closeDayDirectly}
+                    size="small"
+                    sx={{ borderRadius: "8px", whiteSpace: "nowrap" }}
+                    variant="outlined"
+                  >
+                    Encerrar
+                  </Button>
+                )}
               </Stack>
             </Stack>
           </Box>
@@ -2310,6 +2342,7 @@ function HistoryView({
   onAddBreak,
   onAddTime,
   onEdit,
+  onOpenDirectClose,
   onToggleExcludedDay,
   onToggleMedicalLeave,
 }: {
@@ -2317,6 +2350,7 @@ function HistoryView({
   onAddBreak: (date: string) => void;
   onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
+  onOpenDirectClose: (date: string) => void;
   onToggleExcludedDay: (date: string) => Promise<void>;
   onToggleMedicalLeave: (date: string) => Promise<void>;
 }) {
@@ -2529,6 +2563,7 @@ function HistoryView({
               expanded={expandedDate === day.date}
               key={day.date}
               onEdit={onEdit}
+              onOpenDirectClose={onOpenDirectClose}
               onToggleExcludedDay={onToggleExcludedDay}
               onToggleMedicalLeave={onToggleMedicalLeave}
               onToggle={() =>
@@ -2822,6 +2857,7 @@ function HistoryDayCard({
   day,
   expanded,
   onEdit,
+  onOpenDirectClose,
   onToggleExcludedDay,
   onToggleMedicalLeave,
   onToggle,
@@ -2829,6 +2865,7 @@ function HistoryDayCard({
   day: DailySummary;
   expanded: boolean;
   onEdit: (target: EditTarget) => void;
+  onOpenDirectClose: (date: string) => void;
   onToggleExcludedDay: (date: string) => Promise<void>;
   onToggleMedicalLeave: (date: string) => Promise<void>;
   onToggle: () => void;
@@ -2844,6 +2881,7 @@ function HistoryDayCard({
   const isHoliday = day.mark?.type === "holiday";
   const isExcluded = day.mark?.type === "excluded";
   const isMedicalLeave = day.mark?.type === "medical_leave";
+  const canCloseDay = canCloseEntriesDirectly(day.entries);
 
   return (
     <Card component={motion.article} whileHover={{ y: -2 }}>
@@ -2973,6 +3011,19 @@ function HistoryDayCard({
             >
               {isExcluded ? "Restaurar dia" : "Limpar dia"}
             </Button>
+            {canCloseDay && (
+              <Button
+                color="warning"
+                onClick={() => onOpenDirectClose(day.date)}
+                sx={{
+                  borderRadius: "8px",
+                  px: 1.25,
+                }}
+                variant="outlined"
+              >
+                Encerrar dia
+              </Button>
+            )}
             <Button
               color={isMedicalLeave ? "error" : "inherit"}
               onClick={() => void onToggleMedicalLeave(day.date)}
@@ -3685,7 +3736,9 @@ function DirectCloseDayDialog({
   onClose: () => void;
   onSubmit: (type: TimeEntry["type"], occurredAt: string, note?: string) => Promise<void>;
 }) {
-  const [time, setTime] = useState(() => new Date().toTimeString().slice(0, 5));
+  const [time, setTime] = useState(() =>
+    date === toDateKey(new Date()) ? new Date().toTimeString().slice(0, 5) : "18:00",
+  );
   const [note, setNote] = useState("Encerramento direto do expediente");
 
   function submit() {
