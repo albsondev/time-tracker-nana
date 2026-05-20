@@ -20,6 +20,8 @@ import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
+import TrendingDownRoundedIcon from "@mui/icons-material/TrendingDownRounded";
+import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 import type { Session } from "@supabase/supabase-js";
 import {
   Alert,
@@ -753,7 +755,7 @@ function hasCalendarDayActivity(day: CalendarDayItem) {
   return day.entries.length > 0 || day.breaks.length > 0 || Boolean(day.mark);
 }
 
-function getCalendarCellTone(day: CalendarDayItem) {
+function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
   if (day.mark?.type === "medical_leave") {
     return { label: "Atestado", bg: "#fff1f2", border: "#fecdd3", accent: "#be123c", chip: "#ffe4e6" };
   }
@@ -769,6 +771,10 @@ function getCalendarCellTone(day: CalendarDayItem) {
   if (!hasCalendarDayActivity(day)) {
     if (day.status === "today") {
       return { label: "Hoje", bg: "#fff7ed", border: "#fed7aa", accent: "#f57c00", chip: "#ffedd5" };
+    }
+
+    if (todayKey && day.date > todayKey) {
+      return { label: "", bg: "#ffffff", border: "#eee9df", accent: "#94a3b8", chip: "#ffffff" };
     }
 
     return { label: "", bg: "#f7f6f3", border: "#efebe4", accent: "#64748b", chip: "#ffffff" };
@@ -791,6 +797,34 @@ function getCalendarCellTone(day: CalendarDayItem) {
   }
 
   return { label: day.entries.length > 0 || day.breaks.length > 0 ? "Ok" : "", bg: "#f7f6f3", border: "#efebe4", accent: "#64748b", chip: "#ffffff" };
+}
+
+function getCalendarBalanceIndicator(day: CalendarDayItem) {
+  if (!hasCalendarDayActivity(day) || day.mark || day.status === "pending") {
+    return null;
+  }
+
+  if (day.balanceMinutes > 0) {
+    return {
+      direction: "up" as const,
+      label: `+${minutesToHoursLabel(day.balanceMinutes)}`,
+      accent: "#10b981",
+      bg: "#ecfdf5",
+      border: "#a7f3d0",
+    };
+  }
+
+  if (day.balanceMinutes < 0) {
+    return {
+      direction: "down" as const,
+      label: minutesToHoursLabel(day.balanceMinutes),
+      accent: "#ef4444",
+      bg: "#fff1f2",
+      border: "#fecdd3",
+    };
+  }
+
+  return null;
 }
 
 function shouldShowCalendarSidebarDay(day: CalendarDayItem) {
@@ -983,7 +1017,8 @@ function CalendarView({
                     );
                   }
 
-                  const tone = getCalendarCellTone(day);
+                  const tone = getCalendarCellTone(day, tracker.todayKey);
+                  const balanceIndicator = getCalendarBalanceIndicator(day);
                   const hasSummary =
                     day.entries.length > 0 ||
                     day.breaks.length > 0 ||
@@ -1033,13 +1068,13 @@ function CalendarView({
                           <Typography sx={{ fontWeight: 900, fontSize: "0.8rem" }}>
                             {day.day}
                           </Typography>
-                          {tone.label && (
+                          {(tone.label || balanceIndicator) && (
                             <Box
                               sx={{
                                 width: 7,
                                 height: 7,
                                 borderRadius: "50%",
-                                bgcolor: tone.accent,
+                                bgcolor: balanceIndicator?.accent ?? tone.accent,
                                 flexShrink: 0,
                               }}
                             />
@@ -1047,33 +1082,59 @@ function CalendarView({
                         </Stack>
                         {hasSummary && (
                           <Box sx={{ minWidth: 0 }}>
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: tone.accent,
-                                display: "block",
-                                fontWeight: 900,
-                                lineHeight: 1.1,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {tone.label}
-                            </Typography>
-                            <Chip
-                              label={minutesToHoursLabel(day.workedMinutes)}
-                              size="small"
-                              sx={{
-                                borderRadius: "6px",
-                                bgcolor: tone.chip,
-                                color: tone.accent,
-                                fontWeight: 900,
-                                height: 22,
-                                mt: 0.55,
-                                maxWidth: "100%",
-                              }}
-                            />
+                            {balanceIndicator ? (
+                              <Stack
+                                direction="row"
+                                sx={{
+                                  alignItems: "center",
+                                  bgcolor: balanceIndicator.bg,
+                                  border: `1px solid ${balanceIndicator.border}`,
+                                  borderRadius: "999px",
+                                  color: balanceIndicator.accent,
+                                  display: "inline-flex",
+                                  gap: 0.35,
+                                  maxWidth: "100%",
+                                  px: 0.65,
+                                  py: 0.2,
+                                }}
+                              >
+                                {balanceIndicator.direction === "up" ? (
+                                  <TrendingUpRoundedIcon sx={{ fontSize: 16 }} />
+                                ) : (
+                                  <TrendingDownRoundedIcon sx={{ fontSize: 16 }} />
+                                )}
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: "inherit",
+                                    fontWeight: 900,
+                                    lineHeight: 1.1,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {balanceIndicator.label}
+                                </Typography>
+                              </Stack>
+                            ) : (
+                              tone.label && (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: tone.accent,
+                                    display: "block",
+                                    fontWeight: 900,
+                                    lineHeight: 1.1,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {tone.label}
+                                </Typography>
+                              )
+                            )}
                           </Box>
                         )}
                       </Box>
