@@ -1907,6 +1907,22 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
           const details = movement.details ?? [];
           const isExpanded = expandedMovementId === movement.id;
           const detailsCount = details.length;
+          const isCredit = movement.minutesDelta >= 0;
+          const tone = isCredit
+            ? {
+                border: "#a7f3d0",
+                header: "#ecfdf5",
+                headerActive: "#d1fae5",
+                text: "#047857",
+                chip: "#dcfce7",
+              }
+            : {
+                border: "#fed7aa",
+                header: "#fff7ed",
+                headerActive: "#ffedd5",
+                text: "#c2410c",
+                chip: "#ffedd5",
+              };
 
           return (
             <MotionCard
@@ -1919,11 +1935,66 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
               }}
               viewport={{ once: false, amount: 0.18 }}
               transition={{ duration: 0.24, delay: Math.min(index * 0.03, 0.18) }}
+              sx={{
+                borderRadius: "8px",
+                border: `1px solid ${isExpanded ? tone.border : nanaColors.line}`,
+                boxShadow: isExpanded
+                  ? "0 14px 34px rgba(64, 42, 12, 0.10)"
+                  : "0 8px 22px rgba(64, 42, 12, 0.06)",
+                overflow: "hidden",
+              }}
             >
-            <CardContent>
+            <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
               <Stack spacing={1.4}>
-                <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
-                  <Box>
+                <Stack
+                  component={motion.button}
+                  type="button"
+                  whileTap={{ scale: 0.995 }}
+                  onClick={() => setSelectedMovementId(isExpanded ? null : movement.id)}
+                  direction="row"
+                  sx={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 2,
+                    border: 0,
+                    borderBottom: isExpanded ? `1px solid ${tone.border}` : "none",
+                    bgcolor: isExpanded ? tone.headerActive : tone.header,
+                    color: "inherit",
+                    cursor: "pointer",
+                    font: "inherit",
+                    px: 1.25,
+                    py: 1.05,
+                    textAlign: "left",
+                    width: "100%",
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: "center", minWidth: 0 }}
+                  >
+                    <Box
+                      sx={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: "6px",
+                        display: "grid",
+                        placeItems: "center",
+                        bgcolor: "#ffffff",
+                        border: `1px solid ${tone.border}`,
+                        color: tone.text,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <ExpandMoreRoundedIcon
+                        fontSize="small"
+                        sx={{
+                          transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                          transition: "transform 180ms ease",
+                        }}
+                      />
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
                     <Stack
                       direction="row"
                       spacing={0.75}
@@ -1945,50 +2016,67 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
                     <Typography variant="body2" color="text.secondary">
                       {formatDateFullPtBr(movement.date)}
                     </Typography>
-                  </Box>
-                  <Chip
-                    label={minutesToHoursLabel(movement.minutesDelta)}
-                    color={movement.minutesDelta >= 0 ? "secondary" : "warning"}
-                    sx={{ borderRadius: "8px", fontWeight: 900 }}
-                  />
+                    </Box>
+                  </Stack>
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    sx={{ alignItems: "center", flexShrink: 0 }}
+                  >
+                    <Chip
+                      label={detailsCount}
+                      size="small"
+                      icon={<SavingsRoundedIcon fontSize="small" />}
+                      sx={{
+                        borderRadius: "6px",
+                        bgcolor: "#ffffff",
+                        color: "#334155",
+                        fontWeight: 900,
+                        "& .MuiChip-icon": { color: "#334155", ml: 0.6 },
+                      }}
+                    />
+                    <Chip
+                      label={minutesToHoursLabel(movement.minutesDelta)}
+                      size="small"
+                      sx={{
+                        borderRadius: "6px",
+                        bgcolor: tone.chip,
+                        color: tone.text,
+                        fontWeight: 900,
+                      }}
+                    />
+                  </Stack>
                 </Stack>
                 {detailsCount > 0 && (
                   <>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                      <Button
-                        aria-expanded={isExpanded}
-                        color="secondary"
-                        endIcon={
-                          <ExpandMoreRoundedIcon
-                            sx={{
-                              transform: isExpanded
-                                ? "rotate(180deg)"
-                                : "rotate(0deg)",
-                              transition: "transform 180ms ease",
-                            }}
-                          />
-                        }
-                        onClick={() =>
-                          setSelectedMovementId(isExpanded ? null : movement.id)
-                        }
-                        sx={{ borderRadius: "8px", px: 1.25 }}
-                        variant={isExpanded ? "contained" : "outlined"}
-                      >
-                        {isExpanded ? "Ocultar detalhes" : "Ver detalhes"}
-                      </Button>
-                      <Chip
-                        label={`${detailsCount} dias`}
-                        size="small"
-                        sx={{
-                          borderRadius: "6px",
-                          bgcolor: "#f8fafc",
-                          color: "#475569",
-                        }}
-                      />
-                    </Stack>
                     <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                      <Stack spacing={0.8} sx={{ pt: 0.4 }}>
-                        <Divider />
+                      <Box sx={{ bgcolor: "#ffffff", px: 1.25, py: 1.2 }}>
+                        <Stack spacing={1.15}>
+                          <Stack
+                            direction="row"
+                            sx={{
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 1,
+                            }}
+                          >
+                            <Typography variant="body2" color="text.secondary">
+                              Detalhes do movimento
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{ color: tone.text, fontWeight: 900 }}
+                            >
+                              {detailsCount} dias contabilizados
+                            </Typography>
+                          </Stack>
+                          <Box
+                            sx={{
+                              display: "grid",
+                              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
+                              gap: 0.85,
+                            }}
+                          >
                         {details.map((day, detailIndex) => (
                           <Box
                             component={motion.div}
@@ -2064,7 +2152,9 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
                         </Stack>
                           </Box>
                         ))}
-                      </Stack>
+                          </Box>
+                        </Stack>
+                      </Box>
                     </Collapse>
                   </>
                 )}
