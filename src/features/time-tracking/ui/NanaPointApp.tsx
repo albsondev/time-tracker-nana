@@ -323,6 +323,7 @@ export function NanaPointApp() {
                 onAddTime={(date) => setAddTarget({ kind: "time", date })}
                 onEdit={setEditTarget}
                 onOpenDirectClose={setDirectCloseDate}
+                onCompleteDay={tracker.completeDayWithoutDebit}
                 onToggleHoliday={tracker.toggleHoliday}
                 onToggleExcludedDay={tracker.toggleExcludedDay}
                 onToggleMedicalLeave={tracker.toggleMedicalLeave}
@@ -800,7 +801,9 @@ function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
 }
 
 function getCalendarBalanceIndicator(day: CalendarDayItem) {
-  if (!hasCalendarDayActivity(day) || day.mark || day.status === "pending") {
+  const hasBlockingMark = day.mark && day.mark.type !== "completed";
+
+  if (!hasCalendarDayActivity(day) || hasBlockingMark || day.status === "pending") {
     return null;
   }
 
@@ -848,6 +851,7 @@ function CalendarView({
   onAddTime,
   onEdit,
   onOpenDirectClose,
+  onCompleteDay,
   onToggleHoliday,
   onToggleExcludedDay,
   onToggleMedicalLeave,
@@ -857,6 +861,7 @@ function CalendarView({
   onAddTime: (date: string) => void;
   onEdit: (target: EditTarget) => void;
   onOpenDirectClose: (date: string) => void;
+  onCompleteDay: (date: string) => Promise<void>;
   onToggleHoliday: (date: string) => Promise<void>;
   onToggleExcludedDay: (date: string) => Promise<void>;
   onToggleMedicalLeave: (date: string) => Promise<void>;
@@ -1179,6 +1184,7 @@ function CalendarView({
             onEdit={onEdit}
             onAfterEdit={closeDay}
             onOpenDirectClose={onOpenDirectClose}
+            onCompleteDay={onCompleteDay}
             onToggleHoliday={onToggleHoliday}
             onToggleExcludedDay={onToggleExcludedDay}
             onToggleMedicalLeave={onToggleMedicalLeave}
@@ -1460,6 +1466,7 @@ function DayPopoverContent({
   onEdit,
   onAfterEdit,
   onOpenDirectClose,
+  onCompleteDay,
   onToggleHoliday,
   onToggleExcludedDay,
   onToggleMedicalLeave,
@@ -1470,6 +1477,7 @@ function DayPopoverContent({
   onEdit: (target: EditTarget) => void;
   onAfterEdit: () => void;
   onOpenDirectClose: (date: string) => void;
+  onCompleteDay: (date: string) => Promise<void>;
   onToggleHoliday: (date: string) => Promise<void>;
   onToggleExcludedDay: (date: string) => Promise<void>;
   onToggleMedicalLeave: (date: string) => Promise<void>;
@@ -1478,6 +1486,7 @@ function DayPopoverContent({
   const isHoliday = day.mark?.type === "holiday";
   const isExcluded = day.mark?.type === "excluded";
   const isMedicalLeave = day.mark?.type === "medical_leave";
+  const isCompleted = day.mark?.type === "completed";
   const balanceLabel =
     day.balanceMinutes === 0
       ? "0min"
@@ -1487,6 +1496,8 @@ function DayPopoverContent({
       ? "#475569"
       : isMedicalLeave
         ? "#be123c"
+      : isCompleted
+        ? "#047857"
       : isHoliday
       ? "#7c3aed"
       : day.status === "empty"
@@ -1496,10 +1507,19 @@ function DayPopoverContent({
         : "#2563eb";
   const recordCount = day.entries.length + day.breaks.length;
   const canCloseDay = canCloseEntriesDirectly(day.entries);
+  const canCompleteWithoutDebit =
+    hasRecords &&
+    day.balanceMinutes < 0 &&
+    !isHoliday &&
+    !isExcluded &&
+    !isMedicalLeave &&
+    !isCompleted;
   const dayStatusLabel = isExcluded
     ? "Dia limpo"
     : isMedicalLeave
       ? "Atestado médico"
+    : isCompleted
+      ? "Dia concluído"
     : isHoliday
       ? "Feriado"
       : statusLabels[day.dayStatus];
@@ -1509,6 +1529,8 @@ function DayPopoverContent({
     ? "Não contabiliza este dia"
     : isMedicalLeave
       ? "Ausência justificada"
+    : isCompleted
+      ? "Concluído sem débito no banco de horas"
     : day.balanceMinutes === 0
       ? "Sem saldo no dia"
       : `${balanceLabel} de saldo`;
@@ -1531,6 +1553,10 @@ function DayPopoverContent({
   function closeDayDirectly() {
     onOpenDirectClose(day.date);
     onAfterEdit();
+  }
+
+  function completeWithoutDebit() {
+    void onCompleteDay(day.date).then(onAfterEdit);
   }
 
   function toggleHoliday() {
@@ -1611,6 +1637,20 @@ function DayPopoverContent({
                   borderRadius: "6px",
                   bgcolor: "#fff1f2",
                   color: "#be123c",
+                  fontWeight: 900,
+                }}
+              />
+            )}
+            {isCompleted && (
+              <Chip
+                icon={<AccessTimeRoundedIcon fontSize="small" />}
+                label="Dia concluído"
+                size="small"
+                sx={{
+                  mt: 1,
+                  borderRadius: "6px",
+                  bgcolor: "#ecfdf5",
+                  color: "#047857",
                   fontWeight: 900,
                 }}
               />
@@ -1769,7 +1809,7 @@ function DayPopoverContent({
             />
           </Box>
 
-          {canCloseDay && (
+          {(canCloseDay || canCompleteWithoutDebit) && (
             <Box
               component={motion.div}
               initial={{ opacity: 0, y: 10 }}
@@ -1804,15 +1844,17 @@ function DayPopoverContent({
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
-                    Encerrar expediente
+                    {canCloseDay ? "Encerrar expediente" : "Marcar como concluído"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Registra a saÃ­da desta data e tira o dia do estado pendente.
+                    {canCloseDay
+                      ? "Registra a saída desta data e tira o dia do estado pendente."
+                      : "Mantém os horários reais, mas remove o débito deste dia no banco de horas."}
                   </Typography>
                 </Box>
                 <Button
                   color="warning"
-                  onClick={closeDayDirectly}
+                  onClick={canCloseDay ? closeDayDirectly : completeWithoutDebit}
                   size="small"
                   startIcon={<AccessTimeRoundedIcon fontSize="small" />}
                   sx={{
@@ -1823,7 +1865,7 @@ function DayPopoverContent({
                   }}
                   variant="contained"
                 >
-                  Encerrar dia
+                  {canCloseDay ? "Encerrar dia" : "Concluir dia"}
                 </Button>
               </Stack>
             </Box>

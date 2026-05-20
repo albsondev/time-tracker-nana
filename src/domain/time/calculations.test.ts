@@ -8,12 +8,16 @@ import {
   summarizeWeek,
   WEEKLY_EXPECTED_MINUTES,
 } from "./calculations";
-import type { BreakEntry, TimeEntry } from "./types";
+import type { BreakEntry, DayMark, TimeEntry } from "./types";
 
 const userId = "user-test";
 
 function entry(id: string, type: TimeEntry["type"], occurredAt: string): TimeEntry {
   return { id, userId, type, occurredAt };
+}
+
+function mark(id: string, date: string, type: DayMark["type"]): DayMark {
+  return { id, userId, date, type };
 }
 
 describe("time calculations", () => {
@@ -249,6 +253,21 @@ describe("time calculations", () => {
     expect(summary.balanceMinutes).toBe(-120);
   });
 
+  it("does not debit a manually completed short day", () => {
+    const summary = summarizeDay({
+      date: "2026-05-15",
+      entries: [
+        entry("1", "arrival", "2026-05-15T08:00:00-03:00"),
+        entry("2", "departure", "2026-05-15T12:30:00-03:00"),
+      ],
+      mark: mark("completed-1", "2026-05-15", "completed"),
+    });
+
+    expect(summary.status).toBe("closed");
+    expect(summary.workedMinutes).toBe(270);
+    expect(summary.balanceMinutes).toBe(0);
+  });
+
   it("creates automatic weekly hour bank credit above 30 hours", () => {
     const closedCredit = summarizeDay({
       date: "2026-05-05",
@@ -328,6 +347,53 @@ describe("time calculations", () => {
     expect(movements[0].minutesDelta).toBe(-360);
     expect(movements[0].details?.at(4)?.date).toBe("2026-05-08");
     expect(movements[0].details?.at(4)?.workedMinutes).toBe(0);
+  });
+
+  it("does not create weekly debit for a manually completed short day", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-05-11",
+          entries: [
+            entry("1", "arrival", "2026-05-11T08:00:00-03:00"),
+            entry("2", "departure", "2026-05-11T12:30:00-03:00"),
+          ],
+          mark: mark("completed-1", "2026-05-11", "completed"),
+        }),
+        summarizeDay({
+          date: "2026-05-12",
+          entries: [
+            entry("3", "arrival", "2026-05-12T08:00:00-03:00"),
+            entry("4", "departure", "2026-05-12T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-13",
+          entries: [
+            entry("5", "arrival", "2026-05-13T08:00:00-03:00"),
+            entry("6", "departure", "2026-05-13T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-14",
+          entries: [
+            entry("7", "arrival", "2026-05-14T08:00:00-03:00"),
+            entry("8", "departure", "2026-05-14T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-15",
+          entries: [
+            entry("9", "arrival", "2026-05-15T08:00:00-03:00"),
+            entry("10", "departure", "2026-05-15T14:00:00-03:00"),
+          ],
+        }),
+      ],
+      undefined,
+      new Date("2026-05-18T09:00:00-03:00"),
+    );
+
+    expect(movements).toHaveLength(0);
   });
 
   it("does not create weekly debit when the missing day is a holiday", () => {

@@ -83,7 +83,8 @@ function getMarkForDate(marks: DayMark[], date: string) {
 
   return (
     marks.find((mark) => mark.date === date && mark.type === "holiday") ??
-    getNationalHoliday(date)
+    getNationalHoliday(date) ??
+    marks.find((mark) => mark.date === date && mark.type === "completed")
   );
 }
 
@@ -123,6 +124,7 @@ function getCalendarStatus(summary: DailySummary, todayKey: string): CalendarDay
   if (summary.mark?.type === "excluded") return "excluded";
   if (summary.mark?.type === "medical_leave") return "medical_leave";
   if (summary.mark?.type === "holiday") return "holiday";
+  if (summary.mark?.type === "completed") return "completed";
   if (summary.date === todayKey) return "today";
   if (summary.entries.length === 0) return "empty";
   if (summary.status !== "closed") return "pending";
@@ -389,6 +391,14 @@ export function useTimeTracker(params: {
       occurredAt,
       note,
     });
+    if (type === "departure") {
+      await upsertDayMark(params.supabase, {
+        userId: params.userId,
+        date: toDateKey(new Date(occurredAt)),
+        type: "completed",
+        note: "Expediente encerrado manualmente: dia concluído sem débito.",
+      });
+    }
     await reload();
   }
 
@@ -423,6 +433,8 @@ export function useTimeTracker(params: {
   ) {
     if (!params.supabase || !params.userId) return;
 
+    const previousEntry = entries.find((entry) => entry.id === entryId);
+
     setState("loading");
     await updateTimeEntry(params.supabase, {
       id: entryId,
@@ -430,6 +442,42 @@ export function useTimeTracker(params: {
       type,
       occurredAt,
       note,
+    });
+    const previousDate = previousEntry
+      ? toDateKey(new Date(previousEntry.occurredAt))
+      : null;
+    const nextDate = toDateKey(new Date(occurredAt));
+    if (
+      previousEntry?.type === "departure" &&
+      previousDate &&
+      (type !== "departure" || previousDate !== nextDate)
+    ) {
+      await deleteDayMark(params.supabase, {
+        userId: params.userId,
+        date: previousDate,
+        type: "completed",
+      });
+    }
+    if (type === "departure") {
+      await upsertDayMark(params.supabase, {
+        userId: params.userId,
+        date: nextDate,
+        type: "completed",
+        note: "Expediente encerrado manualmente: dia concluído sem débito.",
+      });
+    }
+    await reload();
+  }
+
+  async function completeDayWithoutDebit(date: string) {
+    if (!params.supabase || !params.userId) return;
+
+    setState("loading");
+    await upsertDayMark(params.supabase, {
+      userId: params.userId,
+      date,
+      type: "completed",
+      note: "Dia marcado como concluído: não gera débito de horas.",
     });
     await reload();
   }
@@ -480,6 +528,11 @@ export function useTimeTracker(params: {
         date,
         type: "medical_leave",
       });
+      await deleteDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "completed",
+      });
       await upsertDayMark(params.supabase, {
         userId: params.userId,
         date,
@@ -511,6 +564,11 @@ export function useTimeTracker(params: {
         date,
         type: "excluded",
       });
+      await deleteDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "completed",
+      });
       await upsertDayMark(params.supabase, {
         userId: params.userId,
         date,
@@ -538,6 +596,11 @@ export function useTimeTracker(params: {
         type: "excluded",
       });
     } else {
+      await deleteDayMark(params.supabase, {
+        userId: params.userId,
+        date,
+        type: "completed",
+      });
       await upsertDayMark(params.supabase, {
         userId: params.userId,
         date,
@@ -579,6 +642,7 @@ export function useTimeTracker(params: {
     addBreak,
     editTimeEntry,
     editBreak,
+    completeDayWithoutDebit,
     toggleHoliday,
     toggleExcludedDay,
     toggleMedicalLeave,
