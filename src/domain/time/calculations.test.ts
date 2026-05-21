@@ -397,6 +397,54 @@ describe("time calculations", () => {
     expect(movements[0].minutesDelta).toBe(750);
   });
 
+  it("keeps the daily target when an eight-hour day was marked completed", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-05-11",
+          entries: [
+            entry("1", "arrival", "2026-05-11T08:00:00-03:00"),
+            entry("2", "departure", "2026-05-11T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-12",
+          entries: [
+            entry("3", "arrival", "2026-05-12T08:00:00-03:00"),
+            entry("4", "departure", "2026-05-12T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-13",
+          entries: [
+            entry("5", "arrival", "2026-05-13T08:00:00-03:00"),
+            entry("6", "departure", "2026-05-13T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-14",
+          entries: [
+            entry("7", "arrival", "2026-05-14T08:00:00-03:00"),
+            entry("8", "departure", "2026-05-14T14:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-15",
+          entries: [
+            entry("9", "arrival", "2026-05-15T08:00:00-03:00"),
+            entry("10", "departure", "2026-05-15T16:00:00-03:00"),
+          ],
+          mark: mark("completed-1", "2026-05-15", "completed"),
+        }),
+      ],
+      undefined,
+      new Date("2026-05-18T09:00:00-03:00"),
+    );
+
+    expect(movements).toHaveLength(1);
+    expect(movements[0].minutesDelta).toBe(120);
+  });
+
   it("matches the reported accumulated bank balance with completed Fridays", () => {
     const movements = calculateAutomaticWeeklyBankMovements(
       [

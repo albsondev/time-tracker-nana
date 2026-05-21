@@ -67,6 +67,7 @@ import {
   minutesToHoursLabel,
   toDateKey,
 } from "@/domain/time/format";
+import { isCompletedWithoutDailyTarget } from "@/domain/time/calculations";
 import type {
   BreakCategory,
   BreakEntry,
@@ -769,7 +770,7 @@ function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
     return { label: "Limpo", bg: "#f8fafc", border: "#cbd5e1", accent: "#475569", chip: "#f1f5f9" };
   }
 
-  if (day.mark?.type === "completed") {
+  if (isCompletedWithoutDailyTarget(day)) {
     return { label: "Saldo semanal", bg: "#ffffff", border: "#eee9df", accent: "#047857", chip: "#dcfce7" };
   }
 
@@ -811,7 +812,7 @@ function getCalendarBalanceIndicator(day: CalendarDayItem) {
     return null;
   }
 
-  if (day.mark?.type === "completed" && day.workedMinutes > 0) {
+  if (isCompletedWithoutDailyTarget(day) && day.workedMinutes > 0) {
     return {
       direction: "up" as const,
       label: `+${minutesToHoursLabel(day.workedMinutes)}`,
@@ -853,7 +854,7 @@ function shouldShowCalendarSidebarDay(day: CalendarDayItem) {
     day.mark?.type === "holiday" ||
     day.mark?.type === "medical_leave" ||
     day.mark?.type === "excluded" ||
-    day.mark?.type === "completed" ||
+    isCompletedWithoutDailyTarget(day) ||
     day.status === "pending" ||
     day.balanceMinutes < 0 ||
     day.balanceMinutes > 0
@@ -1501,7 +1502,7 @@ function DayPopoverContent({
   const isHoliday = day.mark?.type === "holiday";
   const isExcluded = day.mark?.type === "excluded";
   const isMedicalLeave = day.mark?.type === "medical_leave";
-  const isCompleted = day.mark?.type === "completed";
+  const isCompleted = isCompletedWithoutDailyTarget(day);
   const balanceLabel =
     isCompleted
       ? `+${minutesToHoursLabel(day.workedMinutes)}`
@@ -2664,7 +2665,7 @@ function getHourBankDayTone(day: DailySummary) {
     };
   }
 
-  if (day.mark?.type === "completed") {
+  if (isCompletedWithoutDailyTarget(day)) {
     return {
       label: "Saldo semanal",
       accent: "#047857",
@@ -2706,7 +2707,7 @@ function getHourBankDayTone(day: DailySummary) {
 function HourBankDayTile({ day, index }: { day: DailySummary; index: number }) {
   const tone = getHourBankDayTone(day);
   const balanceLabel =
-    day.mark?.type === "completed"
+    isCompletedWithoutDailyTarget(day)
       ? `Saldo semanal +${minutesToHoursLabel(day.workedMinutes)}`
       : day.balanceMinutes === 0
         ? "Saldo 0min"
@@ -2836,7 +2837,7 @@ function getHourBankDetailLabel(day: DailySummary) {
     return "Feriado";
   }
 
-  if (day.mark?.type === "completed") {
+  if (isCompletedWithoutDailyTarget(day)) {
     return `Dia concluÃ­do Â· ${minutesToHoursLabel(day.workedMinutes)} entram no saldo semanal`;
   }
 

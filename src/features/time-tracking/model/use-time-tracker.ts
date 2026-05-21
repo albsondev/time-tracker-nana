@@ -7,6 +7,7 @@ import {
   calculateHourBankBalance,
   DAILY_REFERENCE_MINUTES,
   getNextEntryType,
+  isCompletedWithoutDailyTarget,
   summarizeDay,
   WEEKLY_EXPECTED_MINUTES,
 } from "@/domain/time/calculations";
@@ -106,6 +107,32 @@ function summarizeDates(params: {
   );
 }
 
+function shouldAutoCompleteShortClosedDay(params: {
+  date: string;
+  entries: TimeEntry[];
+  breaks: BreakEntry[];
+  marks: DayMark[];
+  now: Date;
+}) {
+  const mark = getMarkForDate(params.marks, params.date);
+
+  if (mark && mark.type !== "completed") return false;
+
+  const summary = summarizeDay({
+    date: params.date,
+    entries: params.entries,
+    breaks: params.breaks,
+    mark,
+    now: params.now,
+  });
+
+  return (
+    summary.status === "closed" &&
+    summary.workedMinutes > 0 &&
+    summary.workedMinutes < DAILY_REFERENCE_MINUTES
+  );
+}
+
 function getRegisteredDates(
   entries: TimeEntry[],
   breaks: BreakEntry[],
@@ -124,7 +151,7 @@ function getCalendarStatus(summary: DailySummary, todayKey: string): CalendarDay
   if (summary.mark?.type === "excluded") return "excluded";
   if (summary.mark?.type === "medical_leave") return "medical_leave";
   if (summary.mark?.type === "holiday") return "holiday";
-  if (summary.mark?.type === "completed") return "completed";
+  if (isCompletedWithoutDailyTarget(summary)) return "completed";
   if (summary.date === todayKey) return "today";
   if (summary.entries.length === 0) return "empty";
   if (summary.status !== "closed") return "pending";
@@ -312,7 +339,8 @@ export function useTimeTracker(params: {
             const isNonWorkingDay =
               day.mark?.type === "holiday" ||
               day.mark?.type === "excluded" ||
-              day.mark?.type === "medical_leave";
+              day.mark?.type === "medical_leave" ||
+              isCompletedWithoutDailyTarget(day);
 
             return total + (isNonWorkingDay ? 0 : DAILY_REFERENCE_MINUTES);
           },
@@ -384,6 +412,18 @@ export function useTimeTracker(params: {
   ) {
     if (!params.supabase || !params.userId) return;
 
+    const entryDate = toDateKey(new Date(occurredAt));
+    const projectedEntries = [
+      ...getEntriesForDate(entries, entryDate),
+      {
+        id: "pending-time-entry",
+        userId: params.userId,
+        type,
+        occurredAt,
+        note,
+      },
+    ];
+
     setState("loading");
     await createTimeEntry(params.supabase, {
       userId: params.userId,
@@ -391,10 +431,19 @@ export function useTimeTracker(params: {
       occurredAt,
       note,
     });
-    if (type === "departure") {
+    if (
+      type === "departure" &&
+      shouldAutoCompleteShortClosedDay({
+        date: entryDate,
+        entries: projectedEntries,
+        breaks: getBreaksForDate(breaks, entryDate),
+        marks,
+        now: today,
+      })
+    ) {
       await upsertDayMark(params.supabase, {
         userId: params.userId,
-        date: toDateKey(new Date(occurredAt)),
+        date: entryDate,
         type: "completed",
         note: "Expediente encerrado manualmente: dia concluído sem débito.",
       });
@@ -447,6 +496,16 @@ export function useTimeTracker(params: {
       ? toDateKey(new Date(previousEntry.occurredAt))
       : null;
     const nextDate = toDateKey(new Date(occurredAt));
+    const projectedEntries = [
+      ...getEntriesForDate(entries, nextDate).filter((entry) => entry.id !== entryId),
+      {
+        id: entryId,
+        userId: params.userId,
+        type,
+        occurredAt,
+        note,
+      },
+    ];
     if (
       previousEntry?.type === "departure" &&
       previousDate &&
@@ -458,7 +517,16 @@ export function useTimeTracker(params: {
         type: "completed",
       });
     }
-    if (type === "departure") {
+    if (
+      type === "departure" &&
+      shouldAutoCompleteShortClosedDay({
+        date: nextDate,
+        entries: projectedEntries,
+        breaks: getBreaksForDate(breaks, nextDate),
+        marks,
+        now: today,
+      })
+    ) {
       await upsertDayMark(params.supabase, {
         userId: params.userId,
         date: nextDate,

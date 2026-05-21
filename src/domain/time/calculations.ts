@@ -72,17 +72,28 @@ function isNonWorkingMark(mark?: DayMark) {
   );
 }
 
+export function isCompletedWithoutDailyTarget(
+  day: Pick<DailySummary, "mark" | "workedMinutes">,
+) {
+  return (
+    day.mark?.type === "completed" &&
+    day.workedMinutes < DAILY_REFERENCE_MINUTES
+  );
+}
+
 function getExpectedMinutesForDay(day: Pick<DailySummary, "mark" | "workedMinutes">) {
   if (isNonWorkingMark(day.mark)) return 0;
-  if (day.mark?.type === "completed") {
-    return Math.min(DAILY_REFERENCE_MINUTES, day.workedMinutes);
+  if (isCompletedWithoutDailyTarget(day)) {
+    return day.workedMinutes;
   }
 
   return DAILY_REFERENCE_MINUTES;
 }
 
-function getWeeklyExpectedMinutesForDay(day: Pick<DailySummary, "mark">) {
-  if (isNonWorkingMark(day.mark) || day.mark?.type === "completed") return 0;
+function getWeeklyExpectedMinutesForDay(
+  day: Pick<DailySummary, "mark" | "workedMinutes">,
+) {
+  if (isNonWorkingMark(day.mark) || isCompletedWithoutDailyTarget(day)) return 0;
 
   return DAILY_REFERENCE_MINUTES;
 }
