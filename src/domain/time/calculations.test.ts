@@ -349,7 +349,7 @@ describe("time calculations", () => {
     expect(movements[0].details?.at(4)?.workedMinutes).toBe(0);
   });
 
-  it("credits all hours above 30 when a short Friday was manually completed", () => {
+  it("credits a completed short Friday without charging its daily target", () => {
     const movements = calculateAutomaticWeeklyBankMovements(
       [
         summarizeDay({
@@ -394,7 +394,125 @@ describe("time calculations", () => {
     );
 
     expect(movements).toHaveLength(1);
-    expect(movements[0].minutesDelta).toBe(390);
+    expect(movements[0].minutesDelta).toBe(750);
+  });
+
+  it("matches the reported accumulated bank balance with completed Fridays", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-04-27",
+          entries: [
+            entry("apr-27-1", "arrival", "2026-04-27T08:00:00-03:00"),
+            entry("apr-27-2", "departure", "2026-04-27T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-04-28",
+          entries: [
+            entry("apr-28-1", "arrival", "2026-04-28T08:00:00-03:00"),
+            entry("apr-28-2", "departure", "2026-04-28T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-04-29",
+          entries: [
+            entry("apr-29-1", "arrival", "2026-04-29T08:00:00-03:00"),
+            entry("apr-29-2", "departure", "2026-04-29T16:30:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-04-30",
+          entries: [
+            entry("apr-30-1", "arrival", "2026-04-30T08:00:00-03:00"),
+            entry("apr-30-2", "departure", "2026-04-30T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-01",
+          entries: [],
+          mark: mark("may-01-holiday", "2026-05-01", "holiday"),
+        }),
+        summarizeDay({
+          date: "2026-05-04",
+          entries: [
+            entry("may-04-1", "arrival", "2026-05-04T08:00:00-03:00"),
+            entry("may-04-2", "departure", "2026-05-04T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-05",
+          entries: [
+            entry("may-05-1", "arrival", "2026-05-05T08:00:00-03:00"),
+            entry("may-05-2", "departure", "2026-05-05T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-06",
+          entries: [
+            entry("may-06-1", "arrival", "2026-05-06T08:00:00-03:00"),
+            entry("may-06-2", "departure", "2026-05-06T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-07",
+          entries: [],
+          mark: mark("may-07-medical", "2026-05-07", "medical_leave"),
+        }),
+        summarizeDay({
+          date: "2026-05-08",
+          entries: [
+            entry("may-08-1", "arrival", "2026-05-08T08:00:00-03:00"),
+            entry("may-08-2", "departure", "2026-05-08T12:30:00-03:00"),
+          ],
+          mark: mark("may-08-completed", "2026-05-08", "completed"),
+        }),
+        summarizeDay({
+          date: "2026-05-11",
+          entries: [
+            entry("may-11-1", "arrival", "2026-05-11T08:00:00-03:00"),
+            entry("may-11-2", "departure", "2026-05-11T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-12",
+          entries: [
+            entry("may-12-1", "arrival", "2026-05-12T08:00:00-03:00"),
+            entry("may-12-2", "departure", "2026-05-12T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-13",
+          entries: [
+            entry("may-13-1", "arrival", "2026-05-13T08:00:00-03:00"),
+            entry("may-13-2", "departure", "2026-05-13T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-14",
+          entries: [
+            entry("may-14-1", "arrival", "2026-05-14T08:00:00-03:00"),
+            entry("may-14-2", "departure", "2026-05-14T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-15",
+          entries: [
+            entry("may-15-1", "arrival", "2026-05-15T08:00:00-03:00"),
+            entry("may-15-2", "departure", "2026-05-15T12:30:00-03:00"),
+          ],
+          mark: mark("may-15-completed", "2026-05-15", "completed"),
+        }),
+      ],
+      undefined,
+      new Date("2026-05-18T09:00:00-03:00"),
+    );
+
+    expect(movements).toHaveLength(3);
+    expect(calculateHourBankBalance(movements)).toBe(1890);
+    expect(movements.find((movement) => movement.date === "2026-05-03")?.minutesDelta).toBe(510);
+    expect(movements.find((movement) => movement.date === "2026-05-10")?.minutesDelta).toBe(630);
+    expect(movements.find((movement) => movement.date === "2026-05-17")?.minutesDelta).toBe(750);
   });
 
   it("does not create weekly debit when the missing day is a holiday", () => {

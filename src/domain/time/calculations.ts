@@ -82,7 +82,9 @@ function getExpectedMinutesForDay(day: Pick<DailySummary, "mark" | "workedMinute
 }
 
 function getWeeklyExpectedMinutesForDay(day: Pick<DailySummary, "mark">) {
-  return isNonWorkingMark(day.mark) ? 0 : DAILY_REFERENCE_MINUTES;
+  if (isNonWorkingMark(day.mark) || day.mark?.type === "completed") return 0;
+
+  return DAILY_REFERENCE_MINUTES;
 }
 
 function isExcludedDay(day: DailySummary) {
