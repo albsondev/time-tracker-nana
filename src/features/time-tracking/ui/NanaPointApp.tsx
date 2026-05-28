@@ -22,6 +22,7 @@ import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
 import TrendingDownRoundedIcon from "@mui/icons-material/TrendingDownRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
+import WavesRoundedIcon from "@mui/icons-material/WavesRounded";
 import type { Session } from "@supabase/supabase-js";
 import {
   Alert,
@@ -53,9 +54,9 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import type { MouseEvent, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   formatDatePtBr,
   formatDateFullPtBr,
@@ -63,7 +64,6 @@ import {
   formatTimePtBr,
   formatWeekdayLongPtBr,
   formatWeekdayShortPtBr,
-  minutesToDecimalHours,
   minutesToHoursLabel,
   toDateKey,
 } from "@/domain/time/format";
@@ -75,7 +75,13 @@ import type {
   TimeEntry,
 } from "@/domain/time/types";
 import { getSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { fadeUp, springy, staggerContainer } from "@/shared/motion/presets";
+import {
+  fadeUp,
+  motionDuration,
+  motionEasing,
+  springy,
+  staggerContainer,
+} from "@/shared/motion/presets";
 import { nanaColors } from "@/shared/theme/nana-theme";
 import { upsertUserProfile } from "../data/time-tracking-repository";
 import { useTimeTracker } from "../model/use-time-tracker";
@@ -203,6 +209,239 @@ function canCloseEntriesDirectly(entries: TimeEntry[]) {
   return hasArrival && !hasDeparture;
 }
 
+function getStatusTone(status: DailySummary["status"]) {
+  switch (status) {
+    case "working":
+      return {
+        gradient: "linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)",
+        accent: "#0ea5e9",
+        label: "Fluxo ativo",
+      };
+    case "at_lunch":
+      return {
+        gradient: "linear-gradient(135deg, #f59e0b 0%, #fb7185 100%)",
+        accent: "#f59e0b",
+        label: "Em pausa de almoco",
+      };
+    case "on_break":
+      return {
+        gradient: "linear-gradient(135deg, #f97316 0%, #fb7185 100%)",
+        accent: "#f97316",
+        label: "Pausa em andamento",
+      };
+    case "closed":
+      return {
+        gradient: "linear-gradient(135deg, #16a34a 0%, #22c55e 100%)",
+        accent: "#16a34a",
+        label: "Dia concluido",
+      };
+    case "incomplete":
+      return {
+        gradient: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)",
+        accent: "#f59e0b",
+        label: "Registro pendente",
+      };
+    case "not_started":
+      return {
+        gradient: "linear-gradient(135deg, #475569 0%, #64748b 100%)",
+        accent: "#64748b",
+        label: "Aguardando inicio",
+      };
+  }
+}
+
+function createCounterChars(value: string) {
+  return value.split("").map((char, index) => ({
+    id: `${index}-${char}`,
+    char,
+    index,
+  }));
+}
+
+function minutesToClockDisplay(minutes: number) {
+  const safeMinutes = Math.max(0, minutes);
+  const hours = Math.floor(safeMinutes / 60);
+  const remainder = safeMinutes % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
+function RollingCounter({ value, label }: { value: string; label?: string }) {
+  const chars = useMemo(() => createCounterChars(value), [value]);
+
+  return (
+    <Stack spacing={0.5}>
+      <Box
+        sx={{
+          display: "inline-flex",
+          alignItems: "baseline",
+          gap: 0.3,
+          px: 1.2,
+          py: 0.6,
+          borderRadius: "12px",
+          bgcolor: "rgba(255, 255, 255, 0.9)",
+          boxShadow: "inset 0 0 0 1px rgba(148, 163, 184, 0.28)",
+          width: "fit-content",
+        }}
+      >
+        {chars.map((token) => (
+          <AnimatePresence initial={false} mode="popLayout" key={token.index}>
+            <motion.span
+              key={token.id}
+              initial={{ y: "42%", opacity: 0, filter: "blur(6px)" }}
+              animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+              exit={{ y: "-42%", opacity: 0, filter: "blur(6px)" }}
+              transition={{
+                duration: motionDuration.medium,
+                ease: motionEasing.standard,
+                delay: token.index * 0.02,
+              }}
+              style={{
+                display: "inline-block",
+                minWidth: token.char === ":" ? 7 : 13,
+                textAlign: "center",
+                fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+                fontSize: "clamp(1.8rem, 7vw, 2.7rem)",
+                fontWeight: 850,
+                lineHeight: 1,
+                color: "#0f172a",
+              }}
+            >
+              {token.char}
+            </motion.span>
+          </AnimatePresence>
+        ))}
+      </Box>
+      {label && (
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+          {label}
+        </Typography>
+      )}
+    </Stack>
+  );
+}
+
+function WorkProgressMeter({
+  workedMinutes,
+  expectedMinutes = 360,
+}: {
+  workedMinutes: number;
+  expectedMinutes?: number;
+}) {
+  const percent = expectedMinutes <= 0 ? 0 : Math.min((workedMinutes / expectedMinutes) * 100, 100);
+
+  return (
+    <Stack spacing={0.6}>
+      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+          Jornada do dia
+        </Typography>
+        <Typography variant="caption" sx={{ fontWeight: 800, color: "#0f766e" }}>
+          {Math.round(percent)}%
+        </Typography>
+      </Stack>
+      <Box
+        sx={{
+          height: 7,
+          borderRadius: 999,
+          bgcolor: "#dbe2ef",
+          overflow: "hidden",
+        }}
+      >
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${percent}%` }}
+          transition={{ duration: motionDuration.slow, ease: motionEasing.emphasized }}
+          style={{
+            height: "100%",
+            background: "linear-gradient(135deg, #2563eb 0%, #22c55e 100%)",
+            borderRadius: 999,
+          }}
+        />
+      </Box>
+    </Stack>
+  );
+}
+
+function buildBalanceSeries(values: number[]) {
+  if (values.length === 0) return [0];
+
+  const cumulative: number[] = [];
+  let running = 0;
+
+  for (const value of values.slice(-8)) {
+    running += value;
+    cumulative.push(running);
+  }
+
+  return cumulative;
+}
+
+function BalanceFlowChart({
+  values,
+  positive,
+}: {
+  values: number[];
+  positive: boolean;
+}) {
+  if (values.length < 2) {
+    return (
+      <Box
+        sx={{
+          height: 72,
+          borderRadius: "14px",
+          border: "1px dashed rgba(148, 163, 184, 0.4)",
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          Sem serie historica
+        </Typography>
+      </Box>
+    );
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * 100;
+      const y = 100 - ((value - min) / range) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <Box sx={{ position: "relative", height: 78 }}>
+      <svg
+        aria-label="Fluxo do banco de horas"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{
+          width: "100%",
+          height: "100%",
+          overflow: "visible",
+        }}
+      >
+        <motion.polyline
+          fill="none"
+          points={points}
+          stroke={positive ? "#16a34a" : "#e11d48"}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={3}
+          initial={{ pathLength: 0, opacity: 0 }}
+          whileInView={{ pathLength: 1, opacity: 1 }}
+          viewport={{ once: false, amount: 0.5 }}
+          transition={{ duration: motionDuration.chart, ease: motionEasing.emphasized }}
+        />
+      </svg>
+    </Box>
+  );
+}
+
 export function NanaPointApp() {
   const [tab, setTab] = useState<Tab>("today");
   const [session, setSession] = useState<Session | null>(null);
@@ -218,8 +457,6 @@ export function NanaPointApp() {
     supabase,
     userId: session?.user.id ?? null,
   });
-
-  const transition = shouldReduceMotion ? { duration: 0 } : springy;
 
   useEffect(() => {
     if (!hasSupabaseConfig()) return;
@@ -286,7 +523,7 @@ export function NanaPointApp() {
       sx={{
         minHeight: "100dvh",
         background:
-          "radial-gradient(circle at top left, rgba(245, 124, 0, 0.18), transparent 32rem), linear-gradient(180deg, #fffaf3 0%, #f5fbf2 100%)",
+          "radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.2), transparent 38rem), radial-gradient(circle at 100% 10%, rgba(6, 182, 212, 0.16), transparent 36rem), linear-gradient(180deg, #f7f8fb 0%, #edf3fb 100%)",
         pb: 11,
       }}
     >
@@ -314,7 +551,6 @@ export function NanaPointApp() {
                 onOpenEntry={() => setEntryDialogOpen(true)}
                 onOpenBreak={() => setBreakDialogOpen(true)}
                 onOpenDirectClose={() => setDirectCloseDate(tracker.todayKey)}
-                transition={transition}
               />
             )}
             {tab === "calendar" && (
@@ -586,20 +822,110 @@ function AppHeader({
   displayName: string;
   hasHourBankMovements: boolean;
 }) {
+  const isPositive = bankBalance >= 0;
+  const todayKey = toDateKey(new Date());
+  const balanceLabel = hasHourBankMovements ? minutesToHoursLabel(bankBalance) : "Sem saldo";
+
   return (
-    <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-      <Box>
-        <Typography variant="overline" color="text.secondary">
-          Nana&apos;s Point
-        </Typography>
-        <Typography variant="h5">Olá, {getFirstName(displayName)}</Typography>
-      </Box>
-      <Chip
-        icon={<SavingsRoundedIcon />}
-        label={hasHourBankMovements ? minutesToHoursLabel(bankBalance) : "Sem saldo"}
-        color={bankBalance >= 0 ? "secondary" : "warning"}
-      />
-    </Stack>
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: motionDuration.medium, ease: motionEasing.standard }}
+    >
+      <Card
+        sx={{
+          mb: 2,
+          borderRadius: "22px",
+          borderColor: "rgba(148, 163, 184, 0.28)",
+          background: "linear-gradient(120deg, #ffffff 0%, #f0f7ff 52%, #ecfeff 100%)",
+          boxShadow: "0 24px 52px rgba(15, 23, 42, 0.14)",
+          overflow: "hidden",
+        }}
+      >
+        <CardContent sx={{ p: 0 }}>
+          <Box sx={{ position: "relative", px: { xs: 1.7, sm: 2.1 }, py: { xs: 1.8, sm: 2 } }}>
+            <Box
+              aria-hidden
+              sx={{
+                position: "absolute",
+                width: 190,
+                height: 190,
+                right: -50,
+                top: -85,
+                borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(37, 99, 235, 0.22), transparent 68%)",
+              }}
+            />
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              sx={{
+                position: "relative",
+                alignItems: { xs: "flex-start", sm: "center" },
+                justifyContent: "space-between",
+                gap: 1.4,
+              }}
+            >
+              <Stack direction="row" spacing={1.1} sx={{ alignItems: "center", minWidth: 0 }}>
+                <Box
+                  component={motion.div}
+                  whileHover={{ rotate: 8, scale: 1.03 }}
+                  transition={{ duration: motionDuration.fast, ease: motionEasing.overshoot }}
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "13px",
+                    display: "grid",
+                    placeItems: "center",
+                    color: "#ffffff",
+                    background: "linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)",
+                    boxShadow: "0 12px 26px rgba(37, 99, 235, 0.28)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <AccessTimeRoundedIcon fontSize="small" />
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 800 }}>
+                    Painel de jornada
+                  </Typography>
+                  <Typography variant="h5" sx={{ lineHeight: 1.07 }}>
+                    Nana&apos;s Point
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#475569", mt: 0.15 }}>
+                    Oi, {getFirstName(displayName)}. Bora fechar o dia com clareza.
+                  </Typography>
+                </Box>
+              </Stack>
+              <Stack spacing={0.8} sx={{ alignItems: { xs: "flex-start", sm: "flex-end" } }}>
+                <Chip
+                  label={`${formatWeekdayLongPtBr(todayKey)} · ${formatDatePtBr(todayKey)}`}
+                  sx={{
+                    borderRadius: "10px",
+                    fontWeight: 800,
+                    color: "#1e3a8a",
+                    bgcolor: "rgba(219, 234, 254, 0.85)",
+                  }}
+                />
+                <Chip
+                  icon={<SavingsRoundedIcon />}
+                  label={balanceLabel}
+                  sx={{
+                    bgcolor: isPositive ? "#dcfce7" : "#ffe4e6",
+                    color: isPositive ? "#166534" : "#9f1239",
+                    borderRadius: "11px",
+                    fontWeight: 900,
+                    px: 0.5,
+                    "& .MuiChip-icon": {
+                      color: isPositive ? "#166534" : "#9f1239",
+                    },
+                  }}
+                />
+              </Stack>
+            </Stack>
+          </Box>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -608,13 +934,11 @@ function TodayView({
   onOpenEntry,
   onOpenBreak,
   onOpenDirectClose,
-  transition,
 }: {
   tracker: ReturnType<typeof useTimeTracker>;
   onOpenEntry: () => void;
   onOpenBreak: () => void;
   onOpenDirectClose: () => void;
-  transition: object;
 }) {
   const summary = tracker.todaySummary;
   const buttonLabel =
@@ -637,69 +961,305 @@ function TodayView({
   const showDirectClose =
     tracker.canCloseDayDirectly && tracker.nextEntryType !== "departure";
   const primaryActionClosesDay = tracker.nextEntryType === "departure";
+  const tone = getStatusTone(summary.status);
+  const flowSeries = buildBalanceSeries(
+    tracker.movements.length > 0
+      ? tracker.movements.map((movement) => movement.minutesDelta)
+      : [tracker.hourBankBalance],
+  );
+  const summaryRecords = [
+    ...summary.entries.map((entry) => ({
+      id: `entry-${entry.id}`,
+      at: entry.occurredAt,
+      label: actionLabels[entry.type],
+      time: formatTimePtBr(entry.occurredAt),
+      accent: "#2563eb",
+    })),
+    ...summary.breaks.map((entry) => ({
+      id: `break-${entry.id}`,
+      at: entry.startsAt,
+      label: breakLabels[entry.category],
+      time: `${formatTimePtBr(entry.startsAt)}-${entry.endsAt ? formatTimePtBr(entry.endsAt) : "aberta"}`,
+      accent: "#f59e0b",
+    })),
+  ]
+    .sort((first, second) => second.at.localeCompare(first.at))
+    .slice(0, 4);
+  const counterLabel =
+    summary.status === "working" || summary.status === "on_break" || summary.status === "at_lunch"
+      ? "Contador ativo"
+      : "Total de hoje";
+  const keyMetrics = [
+    ["Jornada", minutesToHoursLabel(summary.workedMinutes)],
+    ["Pausas", minutesToHoursLabel(summary.breakMinutes)],
+    ["Banco", bankLabel],
+  ] as const;
 
   return (
     <motion.section variants={staggerContainer} initial="hidden" animate="visible">
       <Stack spacing={2}>
-        <MotionCard variants={fadeUp} transition={transition}>
-          <CardContent sx={{ p: 3 }}>
-            <Stack spacing={2}>
-              <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-                <Box>
-                  <Typography color="text.secondary">
-                    {formatDatePtBr(tracker.todayKey)}
-                  </Typography>
-                  <Typography variant="h4">{statusLabels[summary.status]}</Typography>
-                </Box>
-                <AccessTimeRoundedIcon color="primary" fontSize="large" />
-              </Stack>
-              <Typography variant="h2">
-                {minutesToDecimalHours(summary.workedMinutes)}h
-              </Typography>
-              <Typography color="text.secondary">
-                {tracker.hasTodayEntries
-                  ? `${minutesToHoursLabel(summary.breakMinutes)} em pausas registradas hoje.`
-                  : "Nenhum ponto registrado hoje ainda."}
-              </Typography>
-              {tracker.error && <Alert severity="error">{tracker.error}</Alert>}
-              <Stack direction="row" spacing={1}>
-                <Button
-                  fullWidth
-                  size="large"
-                  variant="contained"
-                  disabled={!tracker.nextEntryType || tracker.state === "loading"}
-                  onClick={primaryActionClosesDay ? onOpenDirectClose : onOpenEntry}
-                  component={motion.button}
-                  whileTap={{ scale: 0.97 }}
+        <MotionCard variants={fadeUp}>
+          <CardContent sx={{ p: 0 }}>
+            <Box
+              sx={{
+                position: "relative",
+                overflow: "hidden",
+                px: { xs: 1.6, sm: 2.1 },
+                py: { xs: 1.8, sm: 2.1 },
+                borderRadius: "20px",
+                background: "linear-gradient(140deg, #ffffff 0%, #f7fbff 55%, #ecfeff 100%)",
+              }}
+            >
+              <Box
+                aria-hidden
+                component={motion.div}
+                animate={{
+                  backgroundPosition: ["0% 50%", "100% 50%"],
+                }}
+                transition={{ duration: 8, ease: "linear", repeat: Number.POSITIVE_INFINITY }}
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  background: tone.gradient,
+                  backgroundSize: "220% 220%",
+                  opacity: 0.12,
+                }}
+              />
+              <Stack spacing={2} sx={{ position: "relative" }}>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: { xs: "flex-start", sm: "center" },
+                    gap: 1.2,
+                  }}
                 >
-                  {tracker.state === "loading" ? "Salvando..." : buttonLabel}
-                </Button>
-                {showDirectClose && (
-                  <Button
-                    size="large"
-                    color="warning"
-                    variant="outlined"
-                    disabled={tracker.state === "loading"}
-                    onClick={onOpenDirectClose}
-                    component={motion.button}
-                    whileTap={{ scale: 0.97 }}
-                    sx={{ minWidth: 116 }}
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>
+                      Hoje · {formatDatePtBr(tracker.todayKey)}
+                    </Typography>
+                    <Typography variant="h4" sx={{ mt: 0.15, letterSpacing: "-0.02em" }}>
+                      {statusLabels[summary.status]}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    icon={<WavesRoundedIcon fontSize="small" />}
+                    label={tone.label}
+                    sx={{
+                      bgcolor: "rgba(255,255,255,0.9)",
+                      color: tone.accent,
+                      borderRadius: "11px",
+                      boxShadow: `inset 0 0 0 1px ${tone.accent}33`,
+                      "& .MuiChip-icon": { color: tone.accent },
+                    }}
+                  />
+                </Stack>
+
+                <Stack
+                  direction={{ xs: "column", md: "row" }}
+                  spacing={1.2}
+                  sx={{ alignItems: "stretch" }}
+                >
+                  <Box
+                    sx={{
+                      flex: 1,
+                      position: "relative",
+                      borderRadius: "16px",
+                      p: 1.4,
+                      border: "1px solid rgba(148, 163, 184, 0.32)",
+                      bgcolor: "rgba(255, 255, 255, 0.86)",
+                    }}
                   >
-                    Encerrar
-                  </Button>
-                )}
-                <Button
-                  size="large"
-                  color="secondary"
-                  variant="outlined"
-                  disabled={tracker.state === "loading"}
-                  onClick={onOpenBreak}
-                  component={motion.button}
-                  whileTap={{ scale: 0.97 }}
-                >
-                  Pausa
-                </Button>
+                    <Stack spacing={1.2}>
+                      <RollingCounter
+                        value={minutesToClockDisplay(summary.workedMinutes)}
+                        label={counterLabel}
+                      />
+                      <WorkProgressMeter workedMinutes={summary.workedMinutes} />
+                    </Stack>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      width: { md: 220 },
+                      display: "grid",
+                      gap: 0.8,
+                      gridTemplateColumns: { xs: "repeat(3, minmax(0, 1fr))", md: "1fr" },
+                    }}
+                  >
+                    {keyMetrics.map(([label, value]) => (
+                      <Box
+                        component={motion.div}
+                        key={label}
+                        whileHover={{ y: -2 }}
+                        sx={{
+                          borderRadius: "13px",
+                          border: "1px solid rgba(148, 163, 184, 0.28)",
+                          px: 1.05,
+                          py: 0.8,
+                          bgcolor: "rgba(255, 255, 255, 0.9)",
+                        }}
+                      >
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ fontWeight: 800, lineHeight: 1.1 }}
+                        >
+                          {label}
+                        </Typography>
+                        <Typography sx={{ fontWeight: 900, mt: 0.2, lineHeight: 1.1 }}>
+                          {value}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Stack>
+
+                <Typography color="text.secondary">
+                  {tracker.hasTodayEntries
+                    ? `${minutesToHoursLabel(summary.breakMinutes)} em pausas registradas hoje.`
+                    : "Nenhum ponto registrado hoje ainda."}
+                </Typography>
+
+                {tracker.error && <Alert severity="error">{tracker.error}</Alert>}
+
+                <LayoutGroup>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: "stretch" }}>
+                    {tracker.nextEntryType && tracker.nextEntryType !== "pause" ? (
+                      <motion.div layoutId="primary-clock-action" style={{ flex: 1 }}>
+                        <Button
+                          fullWidth
+                          size="large"
+                          variant="contained"
+                          disabled={tracker.state === "loading"}
+                          onClick={primaryActionClosesDay ? onOpenDirectClose : onOpenEntry}
+                          component={motion.button}
+                          whileTap={{ scale: 0.97 }}
+                          sx={{
+                            borderRadius: "12px",
+                            minHeight: 48,
+                            background: tone.gradient,
+                            fontWeight: 900,
+                          }}
+                        >
+                          {tracker.state === "loading" ? "Salvando..." : buttonLabel}
+                        </Button>
+                      </motion.div>
+                    ) : (
+                      <motion.div layoutId="primary-clock-action" style={{ flex: 1 }}>
+                        <Chip
+                          label="Dia registrado"
+                          sx={{
+                            width: "100%",
+                            height: 48,
+                            fontWeight: 900,
+                            fontSize: "0.95rem",
+                            borderRadius: "12px",
+                            background: tone.gradient,
+                            color: "#ffffff",
+                            animation: "gentlePulse 2.4s ease-in-out infinite",
+                          }}
+                        />
+                      </motion.div>
+                    )}
+                    <Button
+                      size="large"
+                      color="secondary"
+                      variant="outlined"
+                      disabled={tracker.state === "loading"}
+                      onClick={onOpenBreak}
+                      component={motion.button}
+                      whileTap={{ scale: 0.97 }}
+                      sx={{
+                        borderRadius: "12px",
+                        minWidth: { sm: 118 },
+                        bgcolor: "rgba(22, 163, 74, 0.08)",
+                      }}
+                    >
+                      Pausa
+                    </Button>
+                    {showDirectClose && (
+                      <Button
+                        size="large"
+                        color="warning"
+                        variant="outlined"
+                        disabled={tracker.state === "loading"}
+                        onClick={onOpenDirectClose}
+                        component={motion.button}
+                        whileTap={{ scale: 0.97 }}
+                        sx={{ minWidth: { sm: 118 }, borderRadius: "12px" }}
+                      >
+                        Encerrar
+                      </Button>
+                    )}
+                  </Stack>
+                </LayoutGroup>
               </Stack>
+            </Box>
+          </CardContent>
+        </MotionCard>
+
+        <MotionCard variants={fadeUp}>
+          <CardContent sx={{ p: 2 }}>
+            <Stack spacing={1.2}>
+              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                <Typography sx={{ fontWeight: 900 }}>Linha do dia</Typography>
+                <Chip
+                  label={bankLabel}
+                  size="small"
+                  sx={{
+                    bgcolor: tracker.hourBankBalance >= 0 ? "#dcfce7" : "#ffe4e6",
+                    color: tracker.hourBankBalance >= 0 ? "#166534" : "#9f1239",
+                    fontWeight: 900,
+                  }}
+                />
+              </Stack>
+              <BalanceFlowChart values={flowSeries} positive={tracker.hourBankBalance >= 0} />
+              {summaryRecords.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  Assim que você registrar ponto ou pausa, sua linha do tempo aparece aqui.
+                </Typography>
+              ) : (
+                <Stack spacing={0.8}>
+                  {summaryRecords.map((item, index) => (
+                    <Box
+                      component={motion.div}
+                      key={item.id}
+                      initial={{ opacity: 0, x: 14 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: false, amount: 0.55 }}
+                      transition={{ duration: 0.22, delay: index * 0.05 }}
+                      sx={{
+                        borderRadius: "12px",
+                        border: `1px solid ${nanaColors.line}`,
+                        px: 1.1,
+                        py: 0.75,
+                        bgcolor: "#ffffff",
+                      }}
+                    >
+                      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                        <Stack direction="row" spacing={0.7} sx={{ alignItems: "center", minWidth: 0 }}>
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              bgcolor: item.accent,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Typography sx={{ fontWeight: 800 }} noWrap>
+                            {item.label}
+                          </Typography>
+                        </Stack>
+                        <Typography variant="caption" sx={{ color: item.accent, fontWeight: 900 }}>
+                          {item.time}
+                        </Typography>
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
             </Stack>
           </CardContent>
         </MotionCard>
@@ -726,12 +1286,25 @@ function SummaryGrid({ items }: { items: [string, string, string][] }) {
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.2 }}>
       {items.map(([title, value, caption]) => (
-        <MotionCard key={title} variants={fadeUp}>
-          <CardContent sx={{ p: 1.5 }}>
+        <MotionCard
+          key={title}
+          variants={fadeUp}
+          whileHover={{ y: -3, rotateZ: -0.15 }}
+          transition={{ duration: motionDuration.fast, ease: motionEasing.overshoot }}
+        >
+          <CardContent
+            sx={{
+              p: 1.5,
+              background:
+                "linear-gradient(160deg, rgba(255,255,255,0.96) 0%, rgba(239,246,255,0.75) 100%)",
+            }}
+          >
             <Typography variant="caption" color="text.secondary">
               {title}
             </Typography>
-            <Typography variant="h6">{value}</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 900 }}>
+              {value}
+            </Typography>
             <Typography variant="caption" color="text.secondary">
               {caption}
             </Typography>
@@ -1683,7 +2256,7 @@ function DayPopoverContent({
               border: `1px solid ${nanaColors.line}`,
               borderRadius: "8px",
               color: "text.secondary",
-              "&:hover": { bgcolor: nanaColors.cream },
+              "&:hover": { bgcolor: nanaColors.surfaceAlt },
             }}
           >
             <CloseRoundedIcon fontSize="small" />
@@ -2135,7 +2708,7 @@ function CalendarNavButton({
           bgcolor: "#ffffff",
           color: "text.secondary",
           "&:hover": {
-            bgcolor: nanaColors.cream,
+            bgcolor: nanaColors.surfaceAlt,
             color: "primary.main",
           },
         }}
@@ -2206,7 +2779,7 @@ function EmptyDayState() {
       sx={{
         borderRadius: "10px",
         border: `1px dashed ${nanaColors.line}`,
-        bgcolor: nanaColors.cream,
+        bgcolor: nanaColors.surfaceAlt,
         px: 2,
         py: 2.25,
         textAlign: "center",
@@ -2214,12 +2787,12 @@ function EmptyDayState() {
     >
       <CalendarMonthRoundedIcon
         sx={{
-          color: nanaColors.orange,
+          color: nanaColors.amber,
           bgcolor: "#ffffff",
           borderRadius: "50%",
           p: 0.75,
           fontSize: 38,
-          boxShadow: "0 8px 24px rgba(245, 124, 0, 0.18)",
+          boxShadow: "0 8px 24px rgba(245, 158, 11, 0.2)",
           mb: 1,
         }}
       />
@@ -2234,7 +2807,7 @@ function EmptyDayState() {
 function Legend() {
   return (
     <Stack direction="row" sx={{ gap: 1, flexWrap: "wrap" }}>
-      <Chip label="Hoje" sx={{ bgcolor: nanaColors.orangeSoft }} />
+      <Chip label="Hoje" sx={{ bgcolor: nanaColors.amberSoft }} />
       <Chip label="Completo" sx={{ bgcolor: nanaColors.greenSoft }} />
       <Chip label="Excedeu" color="secondary" />
       <Chip label="Atenção" color="warning" />
@@ -2412,29 +2985,55 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
           tracker.movements.some((movement) => movement.id === selectedMovementId)
         ? selectedMovementId
         : null;
+  const balanceSeries = buildBalanceSeries(
+    tracker.movements.length > 0
+      ? tracker.movements.map((movement) => movement.minutesDelta)
+      : [tracker.hourBankBalance],
+  );
+  const isBalancePositive = tracker.hourBankBalance >= 0;
 
   return (
     <Stack spacing={2}>
       <SectionTitle title="Banco de horas" subtitle="Créditos e débitos semanais" />
       {tracker.hasHourBankMovements ? (
-        <Card>
-        <CardContent sx={{ p: 3 }}>
-          <Typography color="text.secondary">Saldo atual</Typography>
-          <Typography
-            component={motion.h2}
-            key={tracker.hourBankBalance}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            variant="h2"
-            color={tracker.hourBankBalance >= 0 ? "secondary.main" : "warning.main"}
-          >
-            {minutesToHoursLabel(tracker.hourBankBalance)}
-          </Typography>
-          <Typography color="text.secondary">
-            Soma créditos e débitos automáticos contra o limite de 30h semanais.
-          </Typography>
-        </CardContent>
-        </Card>
+        <MotionCard variants={fadeUp} initial="hidden" animate="visible">
+          <CardContent sx={{ p: 2.2 }}>
+            <Stack spacing={1.2}>
+              <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", gap: 1 }}>
+                <Typography color="text.secondary">Saldo atual</Typography>
+                <Chip
+                  label={isBalancePositive ? "Crédito" : "Débito"}
+                  sx={{
+                    bgcolor: isBalancePositive ? "#dcfce7" : "#ffe4e6",
+                    color: isBalancePositive ? "#166534" : "#9f1239",
+                    fontWeight: 900,
+                  }}
+                />
+              </Stack>
+              <RollingCounter
+                value={minutesToClockDisplay(Math.abs(tracker.hourBankBalance))}
+                label={tracker.hourBankBalance >= 0 ? "Saldo acumulado" : "Débito acumulado"}
+              />
+              <Typography
+                component={motion.div}
+                key={`bank-sign-${tracker.hourBankBalance >= 0 ? "plus" : "minus"}`}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                sx={{
+                  fontWeight: 900,
+                  color: tracker.hourBankBalance >= 0 ? "#166534" : "#9f1239",
+                }}
+              >
+                {tracker.hourBankBalance >= 0 ? "+" : "-"}
+                {minutesToHoursLabel(Math.abs(tracker.hourBankBalance))}
+              </Typography>
+              <BalanceFlowChart values={balanceSeries} positive={isBalancePositive} />
+              <Typography color="text.secondary">
+                A curva mostra o desenho dos ultimos movimentos do banco contra a jornada semanal.
+              </Typography>
+            </Stack>
+          </CardContent>
+        </MotionCard>
       ) : (
         <Alert severity="info">
           Nenhum movimento de banco de horas foi gerado ainda.
@@ -2886,6 +3485,7 @@ function HistoryView({
   const [expandedHistoryDate, setExpandedHistoryDate] = useState<
     string | "none" | null
   >(null);
+  const deferredSearch = useDeferredValue(search);
   const pageSize = 5;
   const workedThisMonth = tracker.dailySummaries.reduce(
     (total, day) => total + day.workedMinutes,
@@ -2902,7 +3502,7 @@ function HistoryView({
     ? String(tracker.breaks.length)
     : "Sem pausas";
   const filteredDays = registeredDays.filter((day) => {
-    const matchesSearch = recordMatchesSearch(day, search);
+    const matchesSearch = recordMatchesSearch(day, deferredSearch);
     const matchesStart = !startDate || day.date >= startDate;
     const matchesEnd = !endDate || day.date <= endDate;
     const matchesEntryType =
@@ -3055,7 +3655,29 @@ function HistoryView({
         </Alert>
       )}
       {historyGroups.map((group) => (
-        <Stack key={group.monthKey} spacing={1.2}>
+        <Stack
+          component={motion.section}
+          key={group.monthKey}
+          spacing={1.2}
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false, amount: 0.18 }}
+          transition={{ duration: motionDuration.medium, ease: motionEasing.standard }}
+          sx={{ position: "relative", pl: { xs: 0, sm: 0.6 } }}
+        >
+          <Box
+            aria-hidden
+            sx={{
+              position: "absolute",
+              left: { xs: 0, sm: -1 },
+              top: 34,
+              bottom: 6,
+              width: 2,
+              borderRadius: 999,
+              bgcolor: "rgba(37, 99, 235, 0.22)",
+              display: { xs: "none", sm: "block" },
+            }}
+          />
           <Stack
             direction="row"
             sx={{
@@ -3065,7 +3687,7 @@ function HistoryView({
             }}
           >
             <Box>
-              <Typography sx={{ fontWeight: 900 }}>
+              <Typography sx={{ fontWeight: 900, letterSpacing: "-0.01em" }}>
                 {formatMonthPtBr(new Date(`${group.monthKey}-01T12:00:00`))}
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -3078,10 +3700,11 @@ function HistoryView({
               sx={{ borderRadius: "8px" }}
             />
           </Stack>
-          {group.days.map((day) => (
+          {group.days.map((day, index) => (
             <HistoryDayCard
               day={day}
               expanded={expandedDate === day.date}
+              index={index}
               key={day.date}
               onEdit={onEdit}
               onOpenDirectClose={onOpenDirectClose}
@@ -3376,6 +3999,7 @@ function HistoryFilters({
 
 function HistoryDayCard({
   day,
+  index,
   expanded,
   onEdit,
   onOpenDirectClose,
@@ -3384,6 +4008,7 @@ function HistoryDayCard({
   onToggle,
 }: {
   day: DailySummary;
+  index: number;
   expanded: boolean;
   onEdit: (target: EditTarget) => void;
   onOpenDirectClose: (date: string) => void;
@@ -3405,8 +4030,38 @@ function HistoryDayCard({
   const canCloseDay = canCloseEntriesDirectly(day.entries);
 
   return (
-    <Card component={motion.article} whileHover={{ y: -2 }}>
-      <CardContent>
+    <Card
+      component={motion.article}
+      initial={{ opacity: 0, x: 14, filter: "blur(8px)" }}
+      whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+      whileHover={{ y: -3, boxShadow: "0 24px 48px rgba(15, 23, 42, 0.12)" }}
+      viewport={{ once: false, amount: 0.3 }}
+      transition={{
+        duration: motionDuration.medium,
+        ease: motionEasing.standard,
+        delay: Math.min(index * 0.06, 0.24),
+      }}
+      sx={{
+        position: "relative",
+        borderRadius: "14px",
+        overflow: "visible",
+      }}
+    >
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          width: 11,
+          height: 11,
+          borderRadius: "50%",
+          left: -8,
+          top: 24,
+          bgcolor: "#2563eb",
+          boxShadow: "0 0 0 4px rgba(37, 99, 235, 0.16)",
+          display: { xs: "none", sm: "block" },
+        }}
+      />
+      <CardContent sx={{ p: 2 }}>
         <Stack spacing={1.5}>
           <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
             <Box>
@@ -3692,9 +4347,13 @@ function ProfileView({
 
 function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <Box>
-      <Typography variant="h4">{title}</Typography>
-      <Typography color="text.secondary">{subtitle}</Typography>
+    <Box component={motion.div} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <Typography variant="h4" sx={{ letterSpacing: "-0.03em" }}>
+        {title}
+      </Typography>
+      <Typography color="text.secondary" sx={{ mt: 0.2 }}>
+        {subtitle}
+      </Typography>
     </Box>
   );
 }
@@ -3711,7 +4370,7 @@ function BottomAppNavigation({
       position="fixed"
       color="transparent"
       elevation={0}
-      sx={{ top: "auto", bottom: 0, p: { xs: 1, sm: 1.5 }, backdropFilter: "blur(18px)" }}
+      sx={{ top: "auto", bottom: 0, p: { xs: 1, sm: 1.5 }, backdropFilter: "blur(22px)" }}
     >
       <BottomNavigation
         value={tab}
@@ -3721,18 +4380,27 @@ function BottomAppNavigation({
           width: "100%",
           maxWidth: 520,
           mx: "auto",
-          borderRadius: 999,
-          border: `1px solid ${nanaColors.line}`,
-          boxShadow: "0 16px 40px rgba(64, 42, 12, 0.14)",
+          borderRadius: 14,
+          border: "1px solid rgba(148, 163, 184, 0.4)",
+          background:
+            "linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(239,246,255,0.9) 100%)",
+          boxShadow: "0 22px 48px rgba(15, 23, 42, 0.2)",
           px: { xs: 0.5, sm: 1 },
           "& .MuiBottomNavigationAction-root": {
             minWidth: 0,
             maxWidth: "none",
             px: { xs: 0.4, sm: 1 },
             py: { xs: 0.5, sm: 0.75 },
+            borderRadius: 10,
+            transition: "all 180ms cubic-bezier(0.2, 0, 0, 1)",
+          },
+          "& .Mui-selected": {
+            background: "rgba(37, 99, 235, 0.12)",
+            color: "#1d4ed8",
           },
           "& .MuiBottomNavigationAction-label": {
             fontSize: { xs: "0.62rem", sm: "0.72rem" },
+            fontWeight: 700,
           },
           "& .MuiSvgIcon-root": {
             fontSize: { xs: "1.15rem", sm: "1.35rem" },

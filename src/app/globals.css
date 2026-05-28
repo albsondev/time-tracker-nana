@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fffaf3;
-  --foreground: #243228;
+  --background: #f7f8fb;
+  --foreground: #0f172a;
+  --surface-1: #ffffff;
+  --surface-2: #eef2f8;
+  --line: #dbe2ef;
+  --flow-working: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
+  --flow-break: linear-gradient(135deg, #f59e0b 0%, #fb7185 100%);
+  --flow-positive: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #090d14;
+    --foreground: #e5e7eb;
+    --surface-1: #0f172a;
+    --surface-2: #162032;
+    --line: #273247;
+  }
 }
 
 @theme inline {
@@ -22,6 +38,10 @@ body {
 body {
   margin: 0;
   overflow-x: hidden;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.12), transparent 35rem),
+    radial-gradient(circle at 90% 10%, rgba(6, 182, 212, 0.1), transparent 34rem),
+    linear-gradient(180deg, var(--background) 0%, color-mix(in oklab, var(--background), #ffffff 9%) 100%);
 }
 
 * {
@@ -32,4 +52,15 @@ button,
 input,
 textarea {
   font: inherit;
+}
+
+@keyframes gentlePulse {
+  0% { transform: scale(1); opacity: 0.72; }
+  50% { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.72; }
+}
+
+@keyframes shimmerFlow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
 }

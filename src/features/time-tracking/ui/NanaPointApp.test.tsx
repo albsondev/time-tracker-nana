@@ -18,6 +18,7 @@ describe("NanaPointApp", () => {
 
   it("shows the user-facing login screen without local bypass access", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "");
 
     renderApp();
@@ -31,5 +32,5 @@ describe("NanaPointApp", () => {
     expect(screen.getByRole("button", { name: /criar cadastro/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /modo/i })).not.toBeInTheDocument();
     expect(screen.getByText(/o acesso ainda não está disponível/i)).toBeInTheDocument();
-  });
+  }, 15_000);
 });

@@ -206,14 +206,25 @@ export function useTimeTracker(params: {
   const [movements, setMovements] = useState<HourBankMovement[]>([]);
   const [state, setState] = useState<LoadingState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const today = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const initialMonth = new Date();
     initialMonth.setDate(1);
     initialMonth.setHours(12, 0, 0, 0);
     return initialMonth;
   });
-  const todayKey = toDateKey(today);
+  const today = now;
+  const todayKey = toDateKey(now);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(new Date());
+    }, 30_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   const reload = useCallback(async () => {
     if (!params.supabase || !params.userId) return;

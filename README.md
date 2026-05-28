@@ -54,10 +54,14 @@ Crie um arquivo `.env.local` baseado em `.env.example`:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
-Sem essas variaveis, o app nao permite entrada porque o produto usa apenas dados reais do Supabase.
+Use preferencialmente `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (chave `sb_publishable_...`).
+Se quiser, pode manter tambem a chave legada `NEXT_PUBLIC_SUPABASE_ANON_KEY` como fallback.
+
+Sem URL + chave publica, o app nao permite entrada porque o produto usa apenas dados reais do Supabase.
 
 ## Supabase
 
@@ -83,6 +87,36 @@ Tambem sera necessario manter o provedor de e-mail habilitado no painel do Supab
 
 ```bash
 npm run dev
+npm run lint
+npm run test
+npm run build
+```
+
+## Teste local rapido
+
+1. Instale dependencias:
+
+```bash
+npm install
+```
+
+2. Configure `.env.local` com URL e chave publica do Supabase.
+
+3. Rode o app local:
+
+```bash
+npm run dev
+```
+
+4. Abra no navegador:
+
+```text
+http://localhost:3000
+```
+
+5. Validacoes antes de subir alteracoes:
+
+```bash
 npm run lint
 npm run test
 npm run build
