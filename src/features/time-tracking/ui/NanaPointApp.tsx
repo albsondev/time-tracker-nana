@@ -1124,6 +1124,46 @@ function TodayView({
       : primaryActionClosesDay
         ? "Encerrar dia"
         : buttonLabel;
+  const primaryActionTone =
+    tracker.nextEntryType === "arrival"
+      ? {
+          bgcolor: "#0f9f6e",
+          border: "transparent",
+          boxShadow: "0 10px 22px rgba(15, 159, 110, 0.24)",
+          color: "#ffffff",
+          hoverBg: "#0b8d63",
+          hoverShadow: "0 12px 26px rgba(15, 159, 110, 0.3)",
+          iconColor: "#ffffff",
+        }
+      : primaryActionClosesDay
+        ? {
+            bgcolor: "#050505",
+            border: "#050505",
+            boxShadow: "0 10px 22px rgba(5, 5, 5, 0.18)",
+            color: "#ffffff",
+            hoverBg: "#111827",
+            hoverShadow: "0 12px 26px rgba(5, 5, 5, 0.24)",
+            iconColor: "#6ee7b7",
+          }
+        : tracker.nextEntryType === "lunch_start"
+          ? {
+              bgcolor: "#ffffff",
+              border: "#dadce0",
+              boxShadow: "0 1px 2px rgba(60, 64, 67, 0.08)",
+              color: "#111827",
+              hoverBg: "#f8fafd",
+              hoverShadow: "0 4px 12px rgba(60, 64, 67, 0.12)",
+              iconColor: "#ef4444",
+            }
+          : {
+              bgcolor: "#ffffff",
+              border: "#bae6fd",
+              boxShadow: "0 8px 18px rgba(56, 189, 248, 0.08)",
+              color: "#111827",
+              hoverBg: "#f0f9ff",
+              hoverShadow: "0 10px 22px rgba(56, 189, 248, 0.12)",
+              iconColor: "#0284c7",
+            };
   const statusChipLabel =
     summary.status === "not_started"
       ? "Aguardando início"
@@ -1710,15 +1750,19 @@ function TodayView({
                     onClick={primaryActionClosesDay ? onOpenDirectClose : onOpenEntry}
                     startIcon={primaryActionClosesDay ? <StopCircleRoundedIcon /> : <PlayArrowRoundedIcon />}
                     sx={{
-                      bgcolor: "#0f9f6e",
+                      bgcolor: primaryActionTone.bgcolor,
+                      border: `1px solid ${primaryActionTone.border}`,
                       borderRadius: "12px",
-                      boxShadow: "0 10px 22px rgba(15, 159, 110, 0.24)",
-                      color: "#ffffff",
+                      boxShadow: primaryActionTone.boxShadow,
+                      color: primaryActionTone.color,
                       fontWeight: 900,
                       minHeight: 42,
                       "&:hover": {
-                        bgcolor: "#0b8d63",
-                        boxShadow: "0 12px 26px rgba(15, 159, 110, 0.3)",
+                        bgcolor: primaryActionTone.hoverBg,
+                        boxShadow: primaryActionTone.hoverShadow,
+                      },
+                      "& .MuiButton-startIcon": {
+                        color: primaryActionTone.iconColor,
                       },
                     }}
                     variant="contained"
@@ -1745,16 +1789,19 @@ function TodayView({
                   onClick={onOpenBreak}
                   startIcon={<CoffeeRoundedIcon />}
                   sx={{
-                    bgcolor: "#eef8ff",
-                    borderColor: "#7dd3fc",
+                    bgcolor: "#ffffff",
+                    borderColor: "#dadce0",
                     borderRadius: "12px",
-                    color: "#0369a1",
+                    color: "#111827",
                     fontWeight: 900,
                     minHeight: 42,
                     minWidth: { sm: 118 },
                     "&:hover": {
-                      borderColor: "#38bdf8",
-                      bgcolor: "#e0f2fe",
+                      borderColor: "#c7cdd8",
+                      bgcolor: "#f8fafd",
+                    },
+                    "& .MuiButton-startIcon": {
+                      color: "#0284c7",
                     },
                   }}
                   variant="outlined"
@@ -1767,13 +1814,22 @@ function TodayView({
                     onClick={onOpenDirectClose}
                     startIcon={<StopCircleRoundedIcon />}
                     sx={{
+                      bgcolor: "#ef4444",
                       borderRadius: "12px",
+                      boxShadow: "none",
+                      color: "#ffffff",
                       fontWeight: 900,
                       minHeight: 42,
                       minWidth: { sm: 118 },
+                      "&:hover": {
+                        bgcolor: "#dc2626",
+                        boxShadow: "none",
+                      },
+                      "& .MuiButton-startIcon": {
+                        color: "#ffffff",
+                      },
                     }}
-                    color="warning"
-                    variant="outlined"
+                    variant="contained"
                   >
                     Encerrar
                   </Button>
