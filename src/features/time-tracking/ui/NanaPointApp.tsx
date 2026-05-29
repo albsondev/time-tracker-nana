@@ -836,74 +836,191 @@ function clampPercent(value: number) {
   return Math.max(0, Math.min(Math.round(value), 100));
 }
 
-function ActivityProgressRings({
-  metrics,
+type HomeProgressChartDay = {
+  date: string;
+  label: string;
+  summary: DailySummary | null;
+};
+
+function buildProgressChartPoints(values: number[], maxValue: number) {
+  const width = 218;
+  const height = 104;
+  const insetX = 12;
+  const insetY = 14;
+  const drawableWidth = width - insetX * 2;
+  const drawableHeight = height - insetY * 2;
+
+  return values
+    .map((value, index) => {
+      const x = insetX + (index / Math.max(values.length - 1, 1)) * drawableWidth;
+      const y = insetY + (1 - value / maxValue) * drawableHeight;
+
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
+
+function ActivityProgressLineChart({
+  days,
+  todayKey,
 }: {
-  metrics: { color: string; percent: number }[];
+  days: HomeProgressChartDay[];
+  todayKey: string;
 }) {
-  const rings = [
-    { radius: 55, strokeWidth: 4.5 },
-    { radius: 43, strokeWidth: 4 },
-    { radius: 31, strokeWidth: 3.5 },
+  const series = [
+    {
+      color: "#10b981",
+      label: "Créditos",
+      values: days.map((day) => Math.max(day.summary?.balanceMinutes ?? 0, 0) / 60),
+    },
+    {
+      color: "#ef4444",
+      label: "Débitos",
+      values: days.map((day) => Math.max(-(day.summary?.balanceMinutes ?? 0), 0) / 60),
+    },
+    {
+      color: "#78c9f2",
+      label: "Pausas",
+      values: days.map((day) => day.summary?.breaks.length ?? 0),
+    },
+    {
+      color: "#e579ef",
+      label: "Atestados",
+      values: days.map((day) => (day.summary?.mark?.type === "medical_leave" ? 1 : 0)),
+    },
+    {
+      color: "#facc15",
+      label: "Faltas",
+      values: days.map((day) => {
+        const daySummary = day.summary;
+        const hasActivity = Boolean(
+          daySummary &&
+            (daySummary.entries.length > 0 ||
+              daySummary.breaks.length > 0 ||
+              daySummary.mark),
+        );
+
+        return day.date < todayKey && !hasActivity ? 1 : 0;
+      }),
+    },
   ];
+  const maxValue = Math.max(1, ...series.flatMap((item) => item.values));
+  const activeIndex = Math.max(
+    0,
+    days.findIndex((day) => day.date === todayKey),
+  );
 
   return (
-    <Box sx={{ width: 148, height: 148, position: "relative", flexShrink: 0 }}>
-      <svg viewBox="0 0 140 140" width="100%" height="100%">
-        {metrics.map((metric, index) => {
-          const ring = rings[index];
-          const circumference = 2 * Math.PI * ring.radius;
-          const dashOffset = circumference * (1 - metric.percent / 100);
+    <Box
+      sx={{
+        bgcolor: "#ffffff",
+        border: "1px solid #eceef4",
+        borderRadius: "18px",
+        boxShadow: "0 12px 28px rgba(28, 37, 65, 0.045)",
+        minWidth: { sm: 232 },
+        overflow: "hidden",
+        p: 1,
+        width: { xs: "100%", sm: 232 },
+      }}
+    >
+      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mb: 0.7 }}>
+        {series.map((item) => (
+          <Stack
+            direction="row"
+            key={item.label}
+            spacing={0.45}
+            sx={{ alignItems: "center" }}
+          >
+            <Box sx={{ bgcolor: item.color, borderRadius: "50%", height: 7, width: 7 }} />
+            <Typography sx={{ color: "#5f6673", fontSize: "0.64rem", fontWeight: 820 }}>
+              {item.label}
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
+      <Box sx={{ height: 104, position: "relative" }}>
+        <svg
+          aria-label="Linhas semanais de créditos, débitos, faltas, pausas e atestados"
+          viewBox="0 0 218 104"
+          width="100%"
+          height="100%"
+          preserveAspectRatio="none"
+        >
+          {days.map((day, index) => {
+            const x = 12 + (index / Math.max(days.length - 1, 1)) * 194;
 
-          return (
-            <g key={`${metric.color}-${ring.radius}`} transform="rotate(-90 70 70)">
+            return (
+              <line
+                key={day.date}
+                x1={x}
+                x2={x}
+                y1="10"
+                y2="96"
+                stroke={index === activeIndex ? "#d1d5db" : "#e8ebf1"}
+                strokeDasharray="4 5"
+                strokeWidth={index === activeIndex ? 1.4 : 1}
+              />
+            );
+          })}
+          <polyline
+            fill="none"
+            points="12,96 206,96"
+            stroke="#f0f2f6"
+            strokeWidth="1"
+          />
+          {series.map((item, index) => (
+            <motion.polyline
+              fill="none"
+              initial={{ pathLength: 0, opacity: 0 }}
+              key={item.label}
+              points={buildProgressChartPoints(item.values, maxValue)}
+              animate={{ pathLength: 1, opacity: 1 }}
+              stroke={item.color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={index < 2 ? 3 : 2.2}
+              transition={{
+                delay: index * 0.08,
+                duration: motionDuration.slow,
+                ease: motionEasing.emphasized,
+              }}
+            />
+          ))}
+          {days.map((day, index) => {
+            if (day.date !== todayKey) return null;
+
+            const value = series[0].values[index] || series[1].values[index] || 0;
+            const x = 12 + (index / Math.max(days.length - 1, 1)) * 194;
+            const y = 14 + (1 - value / maxValue) * 76;
+
+            return (
               <circle
-                cx="70"
-                cy="70"
-                fill="none"
-                r={ring.radius}
-                stroke="#edf0f5"
-                strokeWidth={ring.strokeWidth}
+                cx={x}
+                cy={Number.isFinite(y) ? y : 90}
+                fill="#ffffff"
+                key={`${day.date}-marker`}
+                r="5.5"
+                stroke="#111827"
+                strokeWidth="2"
               />
-              <motion.circle
-                cx="70"
-                cy="70"
-                fill="none"
-                initial={{ strokeDashoffset: circumference }}
-                animate={{ strokeDashoffset: dashOffset }}
-                r={ring.radius}
-                stroke={metric.color}
-                strokeDasharray={circumference}
-                strokeLinecap="round"
-                strokeWidth={ring.strokeWidth}
-                transition={{
-                  duration: motionDuration.slow,
-                  ease: motionEasing.emphasized,
-                  delay: index * 0.12,
-                }}
-              />
-            </g>
-          );
-        })}
-      </svg>
-      <Stack
-        spacing={0.15}
-        sx={{
-          alignItems: "center",
-          justifyContent: "center",
-          inset: 0,
-          m: "auto",
-          position: "absolute",
-          textAlign: "center",
-          width: 76,
-        }}
-      >
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 900, lineHeight: 1.05 }}>
-          Progresso
-        </Typography>
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 900, lineHeight: 1.05 }}>
-          Semanal
-        </Typography>
+            );
+          })}
+        </svg>
+      </Box>
+      <Stack direction="row" sx={{ justifyContent: "space-between", mt: 0.2 }}>
+        {days.map((day) => (
+          <Typography
+            key={day.date}
+            sx={{
+              color: day.date === todayKey ? "#111827" : "#8a909b",
+              fontSize: "0.61rem",
+              fontWeight: day.date === todayKey ? 900 : 780,
+              textTransform: "uppercase",
+            }}
+          >
+            {day.label.slice(0, 1)}
+          </Typography>
+        ))}
       </Stack>
     </Box>
   );
@@ -930,6 +1047,7 @@ function TodayView({
   const bankLabel = tracker.hasHourBankMovements
     ? minutesToHoursLabel(tracker.hourBankBalance)
     : "Sem saldo";
+  const isBankPositive = tracker.hourBankBalance >= 0;
   const showDirectClose =
     tracker.canCloseDayDirectly && tracker.nextEntryType !== "departure";
   const primaryActionClosesDay = tracker.nextEntryType === "departure";
@@ -1079,6 +1197,10 @@ function TodayView({
       : []),
   ];
 
+  function toggleSelectedDate(date: string) {
+    setSelectedDateOverride((currentDate) => (currentDate === date ? null : date));
+  }
+
   return (
     <motion.section variants={staggerContainer} initial="hidden" animate="visible">
       <Stack spacing={2.05} sx={{ pb: 1 }}>
@@ -1145,41 +1267,116 @@ function TodayView({
             overflow: "hidden",
           }}
         >
-          <Box sx={{ px: { xs: 1.35, sm: 1.55 }, py: { xs: 1.45, sm: 1.65 } }}>
-            <Box sx={{ maxWidth: 330 }}>
-              <Typography
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1.25fr) minmax(150px, 0.75fr)" },
+            }}
+          >
+            <Box sx={{ px: { xs: 1.35, sm: 1.55 }, py: { xs: 1.45, sm: 1.65 } }}>
+              <Box sx={{ maxWidth: 330 }}>
+                <Typography
+                  sx={{
+                    color: "#111827",
+                    fontSize: { xs: "1.78rem", sm: "2.05rem" },
+                    fontWeight: 900,
+                    letterSpacing: 0,
+                    lineHeight: 1.04,
+                  }}
+                >
+                  Olá, {firstName}.
+                </Typography>
+                <Typography
+                  sx={{
+                    color: "#111827",
+                    fontSize: { xs: "1.78rem", sm: "2.05rem" },
+                    fontWeight: 900,
+                    letterSpacing: 0,
+                    lineHeight: 1.04,
+                    mt: 0.15,
+                  }}
+                >
+                  {greeting}!
+                </Typography>
+              </Box>
+              <Box
                 sx={{
-                  color: "#111827",
-                  fontSize: { xs: "1.78rem", sm: "2.05rem" },
-                  fontWeight: 900,
-                  letterSpacing: 0,
-                  lineHeight: 1.04,
+                  bgcolor: "linear-gradient(90deg, #ffe45c 0%, #78c9f2 55%, #e579ef 100%)",
+                  borderRadius: "999px",
+                  height: 4,
+                  mt: 1.45,
+                  width: 86,
                 }}
-              >
-                Olá, {firstName}.
-              </Typography>
-              <Typography
-                sx={{
-                  color: "#111827",
-                  fontSize: { xs: "1.78rem", sm: "2.05rem" },
-                  fontWeight: 900,
-                  letterSpacing: 0,
-                  lineHeight: 1.04,
-                  mt: 0.15,
-                }}
-              >
-                {greeting}!
-              </Typography>
+              />
             </Box>
             <Box
               sx={{
-                bgcolor: "linear-gradient(90deg, #ffe45c 0%, #78c9f2 55%, #e579ef 100%)",
-                borderRadius: "999px",
-                height: 4,
-                mt: 1.45,
-                width: 86,
+                bgcolor: "#050505",
+                background:
+                  "radial-gradient(circle at 88% 10%, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 34%), #050505",
+                borderLeft: { xs: 0, sm: "1px solid #111827" },
+                borderTop: { xs: "1px solid #111827", sm: 0 },
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                px: { xs: 1.35, sm: 1.45 },
+                py: { xs: 1.15, sm: 1.35 },
+                textAlign: "center",
               }}
-            />
+            >
+              <Stack
+                direction="row"
+                spacing={0.75}
+                sx={{ alignItems: "center", justifyContent: "center", mb: 0.8 }}
+              >
+                <Box
+                  sx={{
+                    alignItems: "center",
+                    bgcolor: isBankPositive
+                      ? "rgba(16, 185, 129, 0.16)"
+                      : "rgba(239, 68, 68, 0.16)",
+                    border: isBankPositive
+                      ? "1px solid rgba(16, 185, 129, 0.34)"
+                      : "1px solid rgba(239, 68, 68, 0.34)",
+                    borderRadius: "50%",
+                    color: isBankPositive ? "#6ee7b7" : "#fca5a5",
+                    display: "flex",
+                    height: 28,
+                    justifyContent: "center",
+                    width: 28,
+                  }}
+                >
+                  {isBankPositive ? (
+                    <TrendingUpRoundedIcon sx={{ fontSize: 18 }} />
+                  ) : (
+                    <TrendingDownRoundedIcon sx={{ fontSize: 18 }} />
+                  )}
+                </Box>
+                <Typography sx={{ color: "rgba(255,255,255,0.68)", fontSize: "0.72rem", fontWeight: 850 }}>
+                  Banco de horas
+                </Typography>
+              </Stack>
+              <Typography
+                sx={{
+                  color: "#ffffff",
+                  fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+                  fontSize: { xs: "1.45rem", sm: "1.58rem" },
+                  fontWeight: 920,
+                  lineHeight: 1,
+                }}
+              >
+                {bankLabel}
+              </Typography>
+              <Typography sx={{ color: "rgba(255,255,255,0.58)", fontSize: "0.72rem", fontWeight: 760, mt: 0.65 }}>
+                {tracker.hasHourBankMovements
+                  ? isBankPositive
+                    ? "Saldo positivo acumulado"
+                    : "Saldo em débito acumulado"
+                  : "Sem movimentos no banco"}
+              </Typography>
+            </Box>
           </Box>
         </Box>
 
@@ -1209,7 +1406,8 @@ function TodayView({
                 type="button"
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.96 }}
-                onClick={() => setSelectedDateOverride(item.date)}
+                aria-expanded={selectedDateOverride === item.date}
+                onClick={() => toggleSelectedDate(item.date)}
                 sx={{
                   appearance: "none",
                   bgcolor: "transparent",
@@ -1512,12 +1710,16 @@ function TodayView({
                     onClick={primaryActionClosesDay ? onOpenDirectClose : onOpenEntry}
                     startIcon={primaryActionClosesDay ? <StopCircleRoundedIcon /> : <PlayArrowRoundedIcon />}
                     sx={{
-                      bgcolor: "#5f6f8a",
+                      bgcolor: "#0f9f6e",
                       borderRadius: "12px",
+                      boxShadow: "0 10px 22px rgba(15, 159, 110, 0.24)",
                       color: "#ffffff",
                       fontWeight: 900,
                       minHeight: 42,
-                      "&:hover": { bgcolor: "#52617a" },
+                      "&:hover": {
+                        bgcolor: "#0b8d63",
+                        boxShadow: "0 12px 26px rgba(15, 159, 110, 0.3)",
+                      },
                     }}
                     variant="contained"
                   >
@@ -1543,15 +1745,16 @@ function TodayView({
                   onClick={onOpenBreak}
                   startIcon={<CoffeeRoundedIcon />}
                   sx={{
-                    borderColor: "#10a36d",
+                    bgcolor: "#eef8ff",
+                    borderColor: "#7dd3fc",
                     borderRadius: "12px",
-                    color: "#07936b",
+                    color: "#0369a1",
                     fontWeight: 900,
                     minHeight: 42,
                     minWidth: { sm: 118 },
                     "&:hover": {
-                      borderColor: "#07936b",
-                      bgcolor: "rgba(16, 163, 109, 0.08)",
+                      borderColor: "#38bdf8",
+                      bgcolor: "#e0f2fe",
                     },
                   }}
                   variant="outlined"
@@ -1616,9 +1819,9 @@ function TodayView({
                 />
               </Stack>
               <Stack
-                direction="row"
+                direction={{ xs: "column", sm: "row" }}
                 sx={{
-                  alignItems: "center",
+                  alignItems: { xs: "stretch", sm: "center" },
                   justifyContent: "space-between",
                   gap: 1,
                 }}
@@ -1645,7 +1848,7 @@ function TodayView({
                     </Stack>
                   ))}
                 </Stack>
-                <ActivityProgressRings metrics={progressMetrics} />
+                <ActivityProgressLineChart days={weekStrip} todayKey={summary.date} />
               </Stack>
               <Divider />
               <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>

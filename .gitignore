@@ -43,3 +43,4 @@ supabase/.temp/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+node-v22.22.3.pkg
