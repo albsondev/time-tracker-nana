@@ -459,12 +459,7 @@ export function NanaPointApp() {
         maxWidth={tab === "calendar" ? "lg" : "sm"}
         sx={{ px: { xs: 1.25, sm: 2 }, py: { xs: 1.75, sm: 2.5 } }}
       >
-        {tab !== "today" && (
-          <AppHeader
-            bankBalance={tracker.hourBankBalance}
-            displayName={displayName}
-          />
-        )}
+        <BrandHeader />
 
         <AnimatePresence mode="wait">
           <motion.main
@@ -743,91 +738,63 @@ function AuthScreen() {
   );
 }
 
-function AppHeader({
-  bankBalance,
-  displayName,
-}: {
-  bankBalance: number;
-  displayName: string;
-}) {
-  const initials = getFirstName(displayName).slice(0, 1).toUpperCase();
-  const isPositive = bankBalance >= 0;
-
+function BrandHeader() {
   return (
-    <motion.div
+    <Box
+      component={motion.header}
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: motionDuration.medium, ease: motionEasing.standard }}
+      sx={{
+        display: "flex",
+        justifyContent: "flex-start",
+        mb: 1.55,
+        px: { xs: 0.1, sm: 0.2 },
+      }}
     >
-      <Stack
-        direction="row"
+      <Box
         sx={{
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: 1.2,
-          mb: 1.55,
-          px: { xs: 0.2, sm: 0.35 },
+          bgcolor: "#050505",
+          border: "1px solid #2f3137",
+          borderRadius: "999px",
+          boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.16), 0 1px 2px rgba(60,64,67,0.18)",
+          color: "#ffffff",
+          display: "inline-flex",
+          gap: 1.1,
+          minHeight: 34,
+          pl: 1.55,
+          pr: 0.35,
         }}
       >
-        <Stack direction="row" spacing={1.05} sx={{ alignItems: "center", minWidth: 0 }}>
-          <Box
-            sx={{
-              width: 44,
-              height: 44,
-              borderRadius: "50%",
-              display: "grid",
-              placeItems: "center",
-              bgcolor: "#1f5fbf",
-              color: "#ffffff",
-              fontWeight: 900,
-              fontSize: "0.95rem",
-              letterSpacing: 0,
-              position: "relative",
-              boxShadow: "0 8px 18px rgba(31, 95, 191, 0.28)",
-              flexShrink: 0,
-            }}
-          >
-            {initials}
-            <Box
-              sx={{
-                width: 9,
-                height: 9,
-                borderRadius: "50%",
-                bgcolor: isPositive ? "#22c55e" : "#fb7185",
-                border: "2px solid #f7f7fc",
-                position: "absolute",
-                right: 0,
-                bottom: 1,
-              }}
-            />
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 900, lineHeight: 1.08, fontSize: "1.02rem" }} noWrap>
-              {displayName}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
-              Jornada ativa
-            </Typography>
-          </Box>
-        </Stack>
-        <Tooltip title="Editar perfil">
-          <IconButton
-            size="small"
-            sx={{
-              width: 36,
-              height: 36,
-              border: "1px solid #d8dae5",
-              bgcolor: "rgba(255, 255, 255, 0.84)",
-              color: "#4b5563",
-              flexShrink: 0,
-              "&:hover": { bgcolor: "#ffffff", transform: "translateY(-1px)" },
-            }}
-          >
-            <EditRoundedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Stack>
-    </motion.div>
+        <Typography
+          sx={{
+            color: "#ffffff",
+            fontSize: "0.78rem",
+            fontWeight: 850,
+            letterSpacing: 0,
+            lineHeight: 1,
+          }}
+        >
+          Nana&apos;s Point
+        </Typography>
+        <Box
+          sx={{
+            alignItems: "center",
+            bgcolor: "#ffffff",
+            border: "1px solid rgba(255,255,255,0.72)",
+            borderRadius: "50%",
+            color: "#111827",
+            display: "flex",
+            height: 27,
+            justifyContent: "center",
+            width: 27,
+          }}
+        >
+          <AppsRoundedIcon sx={{ fontSize: 18 }} />
+        </Box>
+      </Box>
+    </Box>
   );
 }
 
@@ -1244,58 +1211,6 @@ function TodayView({
   return (
     <motion.section variants={staggerContainer} initial="hidden" animate="visible">
       <Stack spacing={2.05} sx={{ pb: 1 }}>
-        <Box
-          component={motion.div}
-          variants={fadeUp}
-          sx={{
-            display: "flex",
-            justifyContent: "flex-start",
-          }}
-        >
-          <Box
-            sx={{
-              alignItems: "center",
-              bgcolor: "#050505",
-              border: "1px solid #2f3137",
-              borderRadius: "999px",
-              boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.16), 0 1px 2px rgba(60,64,67,0.18)",
-              color: "#ffffff",
-              display: "inline-flex",
-              gap: 1.1,
-              minHeight: 34,
-              pl: 1.55,
-              pr: 0.35,
-            }}
-          >
-            <Typography
-              sx={{
-                color: "#ffffff",
-                fontSize: "0.78rem",
-                fontWeight: 850,
-                letterSpacing: 0,
-                lineHeight: 1,
-              }}
-            >
-              Nana&apos;s Point
-            </Typography>
-            <Box
-              sx={{
-                alignItems: "center",
-                bgcolor: "#ffffff",
-                border: "1px solid rgba(255,255,255,0.72)",
-                borderRadius: "50%",
-                color: "#111827",
-                display: "flex",
-                height: 27,
-                justifyContent: "center",
-                width: 27,
-              }}
-            >
-              <AppsRoundedIcon sx={{ fontSize: 18 }} />
-            </Box>
-          </Box>
-        </Box>
-
         <Box
           component={motion.div}
           variants={fadeUp}
