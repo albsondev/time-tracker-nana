@@ -2,10 +2,13 @@
 
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import CoffeeRoundedIcon from "@mui/icons-material/CoffeeRounded";
 import DeleteSweepRoundedIcon from "@mui/icons-material/DeleteSweepRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
@@ -17,12 +20,13 @@ import KeyboardDoubleArrowLeftRoundedIcon from "@mui/icons-material/KeyboardDoub
 import KeyboardDoubleArrowRightRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowRightRounded";
 import LocalHospitalRoundedIcon from "@mui/icons-material/LocalHospitalRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
+import StopCircleRoundedIcon from "@mui/icons-material/StopCircleRounded";
 import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
 import TrendingDownRoundedIcon from "@mui/icons-material/TrendingDownRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
-import WavesRoundedIcon from "@mui/icons-material/WavesRounded";
 import type { Session } from "@supabase/supabase-js";
 import {
   Alert,
@@ -54,7 +58,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { MouseEvent, ReactNode } from "react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
@@ -151,6 +155,14 @@ function getFirstName(name: string) {
   return name.trim().split(/\s+/)[0] || name;
 }
 
+function getGreetingForDate(date: Date) {
+  const hour = date.getHours();
+
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 function toDateInputValue(isoDate: string) {
   return toDateKey(new Date(isoDate));
 }
@@ -207,47 +219,6 @@ function canCloseEntriesDirectly(entries: TimeEntry[]) {
   const hasDeparture = entries.some((entry) => entry.type === "departure");
 
   return hasArrival && !hasDeparture;
-}
-
-function getStatusTone(status: DailySummary["status"]) {
-  switch (status) {
-    case "working":
-      return {
-        gradient: "linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)",
-        accent: "#0ea5e9",
-        label: "Fluxo ativo",
-      };
-    case "at_lunch":
-      return {
-        gradient: "linear-gradient(135deg, #f59e0b 0%, #fb7185 100%)",
-        accent: "#f59e0b",
-        label: "Em pausa de almoco",
-      };
-    case "on_break":
-      return {
-        gradient: "linear-gradient(135deg, #f97316 0%, #fb7185 100%)",
-        accent: "#f97316",
-        label: "Pausa em andamento",
-      };
-    case "closed":
-      return {
-        gradient: "linear-gradient(135deg, #16a34a 0%, #22c55e 100%)",
-        accent: "#16a34a",
-        label: "Dia concluido",
-      };
-    case "incomplete":
-      return {
-        gradient: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)",
-        accent: "#f59e0b",
-        label: "Registro pendente",
-      };
-    case "not_started":
-      return {
-        gradient: "linear-gradient(135deg, #475569 0%, #64748b 100%)",
-        accent: "#64748b",
-        label: "Aguardando inicio",
-      };
-  }
 }
 
 function createCounterChars(value: string) {
@@ -317,48 +288,6 @@ function RollingCounter({ value, label }: { value: string; label?: string }) {
           {label}
         </Typography>
       )}
-    </Stack>
-  );
-}
-
-function WorkProgressMeter({
-  workedMinutes,
-  expectedMinutes = 360,
-}: {
-  workedMinutes: number;
-  expectedMinutes?: number;
-}) {
-  const percent = expectedMinutes <= 0 ? 0 : Math.min((workedMinutes / expectedMinutes) * 100, 100);
-
-  return (
-    <Stack spacing={0.6}>
-      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-          Jornada do dia
-        </Typography>
-        <Typography variant="caption" sx={{ fontWeight: 800, color: "#0f766e" }}>
-          {Math.round(percent)}%
-        </Typography>
-      </Stack>
-      <Box
-        sx={{
-          height: 7,
-          borderRadius: 999,
-          bgcolor: "#dbe2ef",
-          overflow: "hidden",
-        }}
-      >
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${percent}%` }}
-          transition={{ duration: motionDuration.slow, ease: motionEasing.emphasized }}
-          style={{
-            height: "100%",
-            background: "linear-gradient(135deg, #2563eb 0%, #22c55e 100%)",
-            borderRadius: 999,
-          }}
-        />
-      </Box>
     </Stack>
   );
 }
@@ -522,8 +451,7 @@ export function NanaPointApp() {
     <Box
       sx={{
         minHeight: "100dvh",
-        background:
-          "radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.2), transparent 38rem), radial-gradient(circle at 100% 10%, rgba(6, 182, 212, 0.16), transparent 36rem), linear-gradient(180deg, #f7f8fb 0%, #edf3fb 100%)",
+        background: "linear-gradient(180deg, #f7f7fc 0%, #eef0f7 100%)",
         pb: 11,
       }}
     >
@@ -531,11 +459,12 @@ export function NanaPointApp() {
         maxWidth={tab === "calendar" ? "lg" : "sm"}
         sx={{ px: { xs: 1.25, sm: 2 }, py: { xs: 1.75, sm: 2.5 } }}
       >
-        <AppHeader
-          bankBalance={tracker.hourBankBalance}
-          displayName={displayName}
-          hasHourBankMovements={tracker.hasHourBankMovements}
-        />
+        {tab !== "today" && (
+          <AppHeader
+            bankBalance={tracker.hourBankBalance}
+            displayName={displayName}
+          />
+        )}
 
         <AnimatePresence mode="wait">
           <motion.main
@@ -547,6 +476,7 @@ export function NanaPointApp() {
           >
             {tab === "today" && (
               <TodayView
+                displayName={displayName}
                 tracker={tracker}
                 onOpenEntry={() => setEntryDialogOpen(true)}
                 onOpenBreak={() => setBreakDialogOpen(true)}
@@ -816,15 +746,12 @@ function AuthScreen() {
 function AppHeader({
   bankBalance,
   displayName,
-  hasHourBankMovements,
 }: {
   bankBalance: number;
   displayName: string;
-  hasHourBankMovements: boolean;
 }) {
+  const initials = getFirstName(displayName).slice(0, 1).toUpperCase();
   const isPositive = bankBalance >= 0;
-  const todayKey = toDateKey(new Date());
-  const balanceLabel = hasHourBankMovements ? minutesToHoursLabel(bankBalance) : "Sem saldo";
 
   return (
     <motion.div
@@ -832,109 +759,164 @@ function AppHeader({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: motionDuration.medium, ease: motionEasing.standard }}
     >
-      <Card
+      <Stack
+        direction="row"
         sx={{
-          mb: 2,
-          borderRadius: "22px",
-          borderColor: "rgba(148, 163, 184, 0.28)",
-          background: "linear-gradient(120deg, #ffffff 0%, #f0f7ff 52%, #ecfeff 100%)",
-          boxShadow: "0 24px 52px rgba(15, 23, 42, 0.14)",
-          overflow: "hidden",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1.2,
+          mb: 1.55,
+          px: { xs: 0.2, sm: 0.35 },
         }}
       >
-        <CardContent sx={{ p: 0 }}>
-          <Box sx={{ position: "relative", px: { xs: 1.7, sm: 2.1 }, py: { xs: 1.8, sm: 2 } }}>
+        <Stack direction="row" spacing={1.05} sx={{ alignItems: "center", minWidth: 0 }}>
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              display: "grid",
+              placeItems: "center",
+              bgcolor: "#1f5fbf",
+              color: "#ffffff",
+              fontWeight: 900,
+              fontSize: "0.95rem",
+              letterSpacing: 0,
+              position: "relative",
+              boxShadow: "0 8px 18px rgba(31, 95, 191, 0.28)",
+              flexShrink: 0,
+            }}
+          >
+            {initials}
             <Box
-              aria-hidden
               sx={{
-                position: "absolute",
-                width: 190,
-                height: 190,
-                right: -50,
-                top: -85,
+                width: 9,
+                height: 9,
                 borderRadius: "50%",
-                background: "radial-gradient(circle, rgba(37, 99, 235, 0.22), transparent 68%)",
+                bgcolor: isPositive ? "#22c55e" : "#fb7185",
+                border: "2px solid #f7f7fc",
+                position: "absolute",
+                right: 0,
+                bottom: 1,
               }}
             />
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              sx={{
-                position: "relative",
-                alignItems: { xs: "flex-start", sm: "center" },
-                justifyContent: "space-between",
-                gap: 1.4,
-              }}
-            >
-              <Stack direction="row" spacing={1.1} sx={{ alignItems: "center", minWidth: 0 }}>
-                <Box
-                  component={motion.div}
-                  whileHover={{ rotate: 8, scale: 1.03 }}
-                  transition={{ duration: motionDuration.fast, ease: motionEasing.overshoot }}
-                  sx={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: "13px",
-                    display: "grid",
-                    placeItems: "center",
-                    color: "#ffffff",
-                    background: "linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)",
-                    boxShadow: "0 12px 26px rgba(37, 99, 235, 0.28)",
-                    flexShrink: 0,
-                  }}
-                >
-                  <AccessTimeRoundedIcon fontSize="small" />
-                </Box>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 800 }}>
-                    Painel de jornada
-                  </Typography>
-                  <Typography variant="h5" sx={{ lineHeight: 1.07 }}>
-                    Nana&apos;s Point
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: "#475569", mt: 0.15 }}>
-                    Oi, {getFirstName(displayName)}. Bora fechar o dia com clareza.
-                  </Typography>
-                </Box>
-              </Stack>
-              <Stack spacing={0.8} sx={{ alignItems: { xs: "flex-start", sm: "flex-end" } }}>
-                <Chip
-                  label={`${formatWeekdayLongPtBr(todayKey)} · ${formatDatePtBr(todayKey)}`}
-                  sx={{
-                    borderRadius: "10px",
-                    fontWeight: 800,
-                    color: "#1e3a8a",
-                    bgcolor: "rgba(219, 234, 254, 0.85)",
-                  }}
-                />
-                <Chip
-                  icon={<SavingsRoundedIcon />}
-                  label={balanceLabel}
-                  sx={{
-                    bgcolor: isPositive ? "#dcfce7" : "#ffe4e6",
-                    color: isPositive ? "#166534" : "#9f1239",
-                    borderRadius: "11px",
-                    fontWeight: 900,
-                    px: 0.5,
-                    "& .MuiChip-icon": {
-                      color: isPositive ? "#166534" : "#9f1239",
-                    },
-                  }}
-                />
-              </Stack>
-            </Stack>
           </Box>
-        </CardContent>
-      </Card>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 900, lineHeight: 1.08, fontSize: "1.02rem" }} noWrap>
+              {displayName}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, lineHeight: 1.25 }}>
+              Jornada ativa
+            </Typography>
+          </Box>
+        </Stack>
+        <Tooltip title="Editar perfil">
+          <IconButton
+            size="small"
+            sx={{
+              width: 36,
+              height: 36,
+              border: "1px solid #d8dae5",
+              bgcolor: "rgba(255, 255, 255, 0.84)",
+              color: "#4b5563",
+              flexShrink: 0,
+              "&:hover": { bgcolor: "#ffffff", transform: "translateY(-1px)" },
+            }}
+          >
+            <EditRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
     </motion.div>
   );
 }
 
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(Math.round(value), 100));
+}
+
+function ActivityProgressRings({
+  metrics,
+}: {
+  metrics: { color: string; percent: number }[];
+}) {
+  const rings = [
+    { radius: 55, strokeWidth: 4.5 },
+    { radius: 43, strokeWidth: 4 },
+    { radius: 31, strokeWidth: 3.5 },
+  ];
+
+  return (
+    <Box sx={{ width: 148, height: 148, position: "relative", flexShrink: 0 }}>
+      <svg viewBox="0 0 140 140" width="100%" height="100%">
+        {metrics.map((metric, index) => {
+          const ring = rings[index];
+          const circumference = 2 * Math.PI * ring.radius;
+          const dashOffset = circumference * (1 - metric.percent / 100);
+
+          return (
+            <g key={`${metric.color}-${ring.radius}`} transform="rotate(-90 70 70)">
+              <circle
+                cx="70"
+                cy="70"
+                fill="none"
+                r={ring.radius}
+                stroke="#edf0f5"
+                strokeWidth={ring.strokeWidth}
+              />
+              <motion.circle
+                cx="70"
+                cy="70"
+                fill="none"
+                initial={{ strokeDashoffset: circumference }}
+                animate={{ strokeDashoffset: dashOffset }}
+                r={ring.radius}
+                stroke={metric.color}
+                strokeDasharray={circumference}
+                strokeLinecap="round"
+                strokeWidth={ring.strokeWidth}
+                transition={{
+                  duration: motionDuration.slow,
+                  ease: motionEasing.emphasized,
+                  delay: index * 0.12,
+                }}
+              />
+            </g>
+          );
+        })}
+      </svg>
+      <Stack
+        spacing={0.15}
+        sx={{
+          alignItems: "center",
+          justifyContent: "center",
+          inset: 0,
+          m: "auto",
+          position: "absolute",
+          textAlign: "center",
+          width: 76,
+        }}
+      >
+        <Typography sx={{ fontSize: "0.72rem", fontWeight: 900, lineHeight: 1.05 }}>
+          Progresso
+        </Typography>
+        <Typography sx={{ fontSize: "0.72rem", fontWeight: 900, lineHeight: 1.05 }}>
+          Semanal
+        </Typography>
+      </Stack>
+    </Box>
+  );
+}
+
 function TodayView({
+  displayName,
   tracker,
   onOpenEntry,
   onOpenBreak,
   onOpenDirectClose,
 }: {
+  displayName: string;
   tracker: ReturnType<typeof useTimeTracker>;
   onOpenEntry: () => void;
   onOpenBreak: () => void;
@@ -945,338 +927,824 @@ function TodayView({
     tracker.nextEntryType && tracker.nextEntryType !== "pause"
       ? actionLabels[tracker.nextEntryType]
       : "Dia registrado";
-  const weekDeltaLabel =
-    tracker.hasWeekEntries && tracker.weekReferenceDelta > 0
-      ? minutesToHoursLabel(tracker.weekReferenceDelta)
-      : tracker.hasWeekEntries
-        ? "Em aberto"
-        : "Sem registros";
-  const weekDeltaCaption =
-    tracker.hasWeekEntries && tracker.weekReferenceDelta > 0
-      ? "Acima da jornada"
-      : "Semana não fechada";
   const bankLabel = tracker.hasHourBankMovements
     ? minutesToHoursLabel(tracker.hourBankBalance)
     : "Sem saldo";
   const showDirectClose =
     tracker.canCloseDayDirectly && tracker.nextEntryType !== "departure";
   const primaryActionClosesDay = tracker.nextEntryType === "departure";
-  const tone = getStatusTone(summary.status);
-  const flowSeries = buildBalanceSeries(
-    tracker.movements.length > 0
-      ? tracker.movements.map((movement) => movement.minutesDelta)
-      : [tracker.hourBankBalance],
+  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
+  const selectedDate = selectedDateOverride ?? summary.date;
+  const monthSummaries = tracker.dailySummaries;
+  const summariesByDate = useMemo(
+    () => new Map(monthSummaries.map((day) => [day.date, day])),
+    [monthSummaries],
   );
-  const summaryRecords = [
-    ...summary.entries.map((entry) => ({
-      id: `entry-${entry.id}`,
-      at: entry.occurredAt,
-      label: actionLabels[entry.type],
-      time: formatTimePtBr(entry.occurredAt),
-      accent: "#2563eb",
-    })),
-    ...summary.breaks.map((entry) => ({
-      id: `break-${entry.id}`,
-      at: entry.startsAt,
-      label: breakLabels[entry.category],
-      time: `${formatTimePtBr(entry.startsAt)}-${entry.endsAt ? formatTimePtBr(entry.endsAt) : "aberta"}`,
-      accent: "#f59e0b",
-    })),
-  ]
-    .sort((first, second) => second.at.localeCompare(first.at))
-    .slice(0, 4);
-  const counterLabel =
-    summary.status === "working" || summary.status === "on_break" || summary.status === "at_lunch"
-      ? "Contador ativo"
-      : "Total de hoje";
-  const keyMetrics = [
-    ["Jornada", minutesToHoursLabel(summary.workedMinutes)],
-    ["Pausas", minutesToHoursLabel(summary.breakMinutes)],
-    ["Banco", bankLabel],
-  ] as const;
+  const completedDays = monthSummaries.filter(
+    (day) => day.status === "closed" || isCompletedWithoutDailyTarget(day),
+  ).length;
+  const activeDays = monthSummaries.filter(
+    (day) => day.entries.length > 0 || day.breaks.length > 0 || Boolean(day.mark),
+  ).length;
+  const selectedDay =
+    summariesByDate.get(selectedDate) ??
+    tracker.historySummaries.find((day) => day.date === selectedDate) ?? {
+      date: selectedDate,
+      status: "not_started" as const,
+      workedMinutes: 0,
+      breakMinutes: 0,
+      balanceMinutes: 0,
+      entries: [],
+      breaks: [],
+    };
+  const selectedDateReference = useMemo(
+    () => new Date(`${selectedDate}T12:00:00`),
+    [selectedDate],
+  );
+  const weekStart = useMemo(() => {
+    const monday = new Date(selectedDateReference);
+    const weekday = monday.getDay();
+    const distanceFromMonday = weekday === 0 ? 6 : weekday - 1;
+    monday.setDate(monday.getDate() - distanceFromMonday);
+    monday.setHours(12, 0, 0, 0);
+    return monday;
+  }, [selectedDateReference]);
+  const weekStrip = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, index) => {
+        const day = new Date(weekStart);
+        day.setDate(weekStart.getDate() + index);
+        const dayKey = toDateKey(day);
+        return {
+          date: dayKey,
+          label: formatWeekdayShortPtBr(dayKey),
+          day: day.getDate(),
+          summary: summariesByDate.get(dayKey) ?? null,
+        };
+      }),
+    [summariesByDate, weekStart],
+  );
+  const selectedTimelineMoments = [
+    ...selectedDay.entries.map((entry) => entry.occurredAt),
+    ...selectedDay.breaks.flatMap((entry) =>
+      entry.endsAt ? [entry.startsAt, entry.endsAt] : [entry.startsAt],
+    ),
+  ].sort((first, second) => first.localeCompare(second));
+  const selectedRangeLabel =
+    selectedTimelineMoments.length > 0
+      ? `${formatTimePtBr(selectedTimelineMoments[0])} - ${formatTimePtBr(selectedTimelineMoments[selectedTimelineMoments.length - 1])}`
+      : "Sem horários registrados";
+  const selectedBreakLabel =
+    selectedDay.breaks.length > 0
+      ? `${selectedDay.breaks.length} pausa${selectedDay.breaks.length > 1 ? "s" : ""}`
+      : "Sem pausas";
+  const selectedWorkedLabel = minutesToHoursLabel(selectedDay.workedMinutes);
+  const isPrimaryActionAvailable = tracker.nextEntryType && tracker.nextEntryType !== "pause";
+  const primaryButtonLabel =
+    tracker.nextEntryType === "arrival"
+      ? "Iniciar dia"
+      : primaryActionClosesDay
+        ? "Encerrar dia"
+        : buttonLabel;
+  const statusChipLabel =
+    summary.status === "not_started"
+      ? "Aguardando início"
+      : statusLabels[summary.status];
+  const firstName = getFirstName(displayName);
+  const greeting = getGreetingForDate(tracker.today);
+  const todayProgress = clampPercent((summary.workedMinutes / 360) * 100);
+  const weekProgress = clampPercent(
+    tracker.weekExpectedMinutes > 0
+      ? (tracker.weekWorkedMinutes / tracker.weekExpectedMinutes) * 100
+      : 0,
+  );
+  const breakProgress = clampPercent((summary.breakMinutes / 60) * 100);
+  const bankProgress = tracker.hasHourBankMovements
+    ? clampPercent((Math.abs(tracker.hourBankBalance) / 360) * 100)
+    : 0;
+  const progressMetrics = [
+    {
+      color: "#ffe45c",
+      label: "Jornada",
+      meta: `${todayProgress}% · ${selectedWorkedLabel}`,
+      percent: todayProgress,
+    },
+    {
+      color: "#78c9f2",
+      label: "Semana",
+      meta: `${weekProgress}% · ${minutesToHoursLabel(tracker.weekWorkedMinutes)}`,
+      percent: weekProgress,
+    },
+    {
+      color: "#e579ef",
+      label: "Banco",
+      meta: `${bankProgress}% · ${bankLabel}`,
+      percent: bankProgress,
+    },
+  ];
+  const taskCards = [
+    {
+      accent: "#ffe45c",
+      bg: "#fff9d7",
+      icon: <AccessTimeRoundedIcon fontSize="small" />,
+      label: tracker.state === "loading" ? "Salvando..." : buttonLabel,
+      meta: `${minutesToClockDisplay(summary.workedMinutes)} horas hoje`,
+      onClick: primaryActionClosesDay ? onOpenDirectClose : onOpenEntry,
+      percent: todayProgress,
+      disabled: !isPrimaryActionAvailable || tracker.state === "loading",
+    },
+    {
+      accent: "#e579ef",
+      bg: "#fdefff",
+      icon: <CoffeeRoundedIcon fontSize="small" />,
+      label: "Registrar pausa",
+      meta: selectedBreakLabel,
+      onClick: onOpenBreak,
+      percent: breakProgress,
+      disabled: tracker.state === "loading",
+    },
+    ...(showDirectClose
+      ? [
+          {
+            accent: "#78c9f2",
+            bg: "#eaf8ff",
+            icon: <StopCircleRoundedIcon fontSize="small" />,
+            label: "Encerrar expediente",
+            meta: selectedRangeLabel,
+            onClick: onOpenDirectClose,
+            percent: Math.max(todayProgress, 1),
+            disabled: tracker.state === "loading",
+          },
+        ]
+      : []),
+  ];
 
   return (
     <motion.section variants={staggerContainer} initial="hidden" animate="visible">
-      <Stack spacing={2}>
-        <MotionCard variants={fadeUp}>
-          <CardContent sx={{ p: 0 }}>
-            <Box
+      <Stack spacing={2.05} sx={{ pb: 1 }}>
+        <Box
+          component={motion.div}
+          variants={fadeUp}
+          sx={{
+            display: "flex",
+            justifyContent: "flex-start",
+          }}
+        >
+          <Box
+            sx={{
+              alignItems: "center",
+              bgcolor: "#050505",
+              border: "1px solid #2f3137",
+              borderRadius: "999px",
+              boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.16), 0 1px 2px rgba(60,64,67,0.18)",
+              color: "#ffffff",
+              display: "inline-flex",
+              gap: 1.1,
+              minHeight: 34,
+              pl: 1.55,
+              pr: 0.35,
+            }}
+          >
+            <Typography
               sx={{
-                position: "relative",
-                overflow: "hidden",
-                px: { xs: 1.6, sm: 2.1 },
-                py: { xs: 1.8, sm: 2.1 },
-                borderRadius: "20px",
-                background: "linear-gradient(140deg, #ffffff 0%, #f7fbff 55%, #ecfeff 100%)",
+                color: "#ffffff",
+                fontSize: "0.78rem",
+                fontWeight: 850,
+                letterSpacing: 0,
+                lineHeight: 1,
               }}
             >
-              <Box
-                aria-hidden
-                component={motion.div}
-                animate={{
-                  backgroundPosition: ["0% 50%", "100% 50%"],
-                }}
-                transition={{ duration: 8, ease: "linear", repeat: Number.POSITIVE_INFINITY }}
+              Nana&apos;s Point
+            </Typography>
+            <Box
+              sx={{
+                alignItems: "center",
+                bgcolor: "#ffffff",
+                border: "1px solid rgba(255,255,255,0.72)",
+                borderRadius: "50%",
+                color: "#111827",
+                display: "flex",
+                height: 27,
+                justifyContent: "center",
+                width: 27,
+              }}
+            >
+              <AppsRoundedIcon sx={{ fontSize: 18 }} />
+            </Box>
+          </Box>
+        </Box>
+
+        <Box
+          component={motion.div}
+          variants={fadeUp}
+          sx={{
+            bgcolor: "#ffffff",
+            border: "1px solid #dadce0",
+            borderRadius: "22px",
+            boxShadow: "0 1px 2px rgba(60, 64, 67, 0.08)",
+            overflow: "hidden",
+          }}
+        >
+          <Box sx={{ px: { xs: 1.35, sm: 1.55 }, py: { xs: 1.45, sm: 1.65 } }}>
+            <Box sx={{ maxWidth: 330 }}>
+              <Typography
                 sx={{
-                  position: "absolute",
-                  inset: 0,
-                  background: tone.gradient,
-                  backgroundSize: "220% 220%",
-                  opacity: 0.12,
+                  color: "#111827",
+                  fontSize: { xs: "1.78rem", sm: "2.05rem" },
+                  fontWeight: 900,
+                  letterSpacing: 0,
+                  lineHeight: 1.04,
                 }}
-              />
-              <Stack spacing={2} sx={{ position: "relative" }}>
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
+              >
+                Olá, {firstName}.
+              </Typography>
+              <Typography
+                sx={{
+                  color: "#111827",
+                  fontSize: { xs: "1.78rem", sm: "2.05rem" },
+                  fontWeight: 900,
+                  letterSpacing: 0,
+                  lineHeight: 1.04,
+                  mt: 0.15,
+                }}
+              >
+                {greeting}!
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                bgcolor: "linear-gradient(90deg, #ffe45c 0%, #78c9f2 55%, #e579ef 100%)",
+                borderRadius: "999px",
+                height: 4,
+                mt: 1.45,
+                width: 86,
+              }}
+            />
+          </Box>
+        </Box>
+
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 0.7 }}>
+          {weekStrip.map((item, index) => {
+            void index;
+            const isSelected = item.date === selectedDate;
+            const isToday = item.date === summary.date;
+            const isPast = item.date < summary.date;
+            const daySummary = item.summary;
+            const hasMedicalLeave = daySummary?.mark?.type === "medical_leave";
+            const hasHoliday = daySummary?.mark?.type === "holiday";
+            const showBalanceIcon =
+              Boolean(daySummary) &&
+              isPast &&
+              !hasMedicalLeave &&
+              !hasHoliday &&
+              (daySummary!.balanceMinutes !== 0 || isCompletedWithoutDailyTarget(daySummary!));
+            const balanceIsPositive =
+              Boolean(daySummary) &&
+              (daySummary!.balanceMinutes > 0 || isCompletedWithoutDailyTarget(daySummary!));
+
+            return (
+              <Box
+                component={motion.button}
+                key={item.date}
+                type="button"
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.96 }}
+                onClick={() => setSelectedDateOverride(item.date)}
+                sx={{
+                  appearance: "none",
+                  bgcolor: "transparent",
+                  border: 0,
+                  color: "#111827",
+                  cursor: "pointer",
+                  font: "inherit",
+                  p: 0,
+                  textAlign: "center",
+                }}
+              >
+                <Box
                   sx={{
-                    justifyContent: "space-between",
-                    alignItems: { xs: "flex-start", sm: "center" },
-                    gap: 1.2,
+                    alignItems: "center",
+                    bgcolor: isToday ? "#050505" : "#ffffff",
+                    border: isToday
+                      ? "1px solid #050505"
+                      : isSelected
+                        ? "1px solid #111827"
+                        : "1px solid #dadce0",
+                    borderRadius: "14px",
+                    boxShadow: isToday ? "0 10px 20px rgba(0,0,0,0.16)" : "none",
+                    color: isToday ? "#ffffff" : "#111827",
+                    display: "flex",
+                    flexDirection: "column",
+                    height: 76,
+                    justifyContent: "center",
+                    mx: "auto",
+                    width: "100%",
                   }}
                 >
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>
-                      Hoje · {formatDatePtBr(tracker.todayKey)}
-                    </Typography>
-                    <Typography variant="h4" sx={{ mt: 0.15, letterSpacing: "-0.02em" }}>
-                      {statusLabels[summary.status]}
-                    </Typography>
-                  </Box>
-                  <Chip
-                    icon={<WavesRoundedIcon fontSize="small" />}
-                    label={tone.label}
+                  <Typography
                     sx={{
-                      bgcolor: "rgba(255,255,255,0.9)",
-                      color: tone.accent,
-                      borderRadius: "11px",
-                      boxShadow: `inset 0 0 0 1px ${tone.accent}33`,
-                      "& .MuiChip-icon": { color: tone.accent },
-                    }}
-                  />
-                </Stack>
-
-                <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  spacing={1.2}
-                  sx={{ alignItems: "stretch" }}
-                >
-                  <Box
-                    sx={{
-                      flex: 1,
-                      position: "relative",
-                      borderRadius: "16px",
-                      p: 1.4,
-                      border: "1px solid rgba(148, 163, 184, 0.32)",
-                      bgcolor: "rgba(255, 255, 255, 0.86)",
+                      color: isToday ? "rgba(255,255,255,0.72)" : "#7b808b",
+                      fontSize: "0.62rem",
+                      fontWeight: 850,
+                      lineHeight: 1,
                     }}
                   >
-                    <Stack spacing={1.2}>
-                      <RollingCounter
-                        value={minutesToClockDisplay(summary.workedMinutes)}
-                        label={counterLabel}
-                      />
-                      <WorkProgressMeter workedMinutes={summary.workedMinutes} />
-                    </Stack>
+                    {item.label}
+                  </Typography>
+                  <Typography sx={{ fontSize: "1.18rem", fontWeight: 900, lineHeight: 1.05, mt: 0.4 }}>
+                    {String(item.day).padStart(2, "0")}
+                  </Typography>
+                  <Box sx={{ height: 16, mt: 0.3, display: "grid", placeItems: "center" }}>
+                    {showBalanceIcon && (
+                      balanceIsPositive ? (
+                        <TrendingUpRoundedIcon sx={{ color: "#10b981", fontSize: 17 }} />
+                      ) : (
+                        <TrendingDownRoundedIcon sx={{ color: "#ef4444", fontSize: 17 }} />
+                      )
+                    )}
+                    {hasMedicalLeave && (
+                      <Box sx={{ bgcolor: "#ef4444", borderRadius: "50%", height: 6, width: 6 }} />
+                    )}
+                    {hasHoliday && (
+                      <Box sx={{ bgcolor: "#facc15", borderRadius: "50%", height: 6, width: 6 }} />
+                    )}
                   </Box>
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
 
-                  <Box
-                    sx={{
-                      width: { md: 220 },
-                      display: "grid",
-                      gap: 0.8,
-                      gridTemplateColumns: { xs: "repeat(3, minmax(0, 1fr))", md: "1fr" },
-                    }}
-                  >
-                    {keyMetrics.map(([label, value]) => (
-                      <Box
-                        component={motion.div}
-                        key={label}
-                        whileHover={{ y: -2 }}
-                        sx={{
-                          borderRadius: "13px",
-                          border: "1px solid rgba(148, 163, 184, 0.28)",
-                          px: 1.05,
-                          py: 0.8,
-                          bgcolor: "rgba(255, 255, 255, 0.9)",
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ fontWeight: 800, lineHeight: 1.1 }}
-                        >
+        <AnimatePresence initial={false}>
+          {selectedDateOverride && (
+            <MotionCard
+              key={selectedDate}
+              variants={fadeUp}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              sx={{
+                bgcolor: "#ffffff",
+                borderColor: "#dadce0",
+                borderRadius: "16px",
+                boxShadow: "0 1px 2px rgba(60, 64, 67, 0.08)",
+              }}
+            >
+              <CardContent sx={{ p: 1.2 }}>
+                <Stack spacing={1}>
+                  <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 900, lineHeight: 1.15 }}>
+                        {formatWeekdayLongPtBr(selectedDay.date)}
+                      </Typography>
+                      <Typography color="text.secondary" sx={{ fontSize: "0.76rem", fontWeight: 720 }}>
+                        {formatDateFullPtBr(selectedDay.date)}
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={selectedDay.mark?.type === "medical_leave"
+                        ? "Atestado"
+                        : selectedDay.mark?.type === "holiday"
+                          ? "Feriado"
+                          : statusLabels[selectedDay.status]}
+                      size="small"
+                      sx={{
+                        bgcolor: "#f8fafd",
+                        border: "1px solid #e8eaed",
+                        borderRadius: "999px",
+                        fontWeight: 850,
+                      }}
+                    />
+                  </Stack>
+                  <Divider sx={{ borderColor: "#e8eaed" }} />
+                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 0.75 }}>
+                    {[
+                      ["Horário", selectedTimelineMoments.length > 0 ? selectedRangeLabel : "Sem ponto"],
+                      ["Jornada", selectedWorkedLabel],
+                      ["Saldo", minutesToHoursLabel(selectedDay.balanceMinutes)],
+                    ].map(([label, value]) => (
+                      <Box key={label} sx={{ minWidth: 0 }}>
+                        <Typography color="text.secondary" sx={{ fontSize: "0.68rem", fontWeight: 780 }} noWrap>
                           {label}
                         </Typography>
-                        <Typography sx={{ fontWeight: 900, mt: 0.2, lineHeight: 1.1 }}>
+                        <Typography sx={{ fontSize: "0.82rem", fontWeight: 900, mt: 0.15 }} noWrap>
                           {value}
                         </Typography>
                       </Box>
                     ))}
                   </Box>
                 </Stack>
+              </CardContent>
+            </MotionCard>
+          )}
+        </AnimatePresence>
 
-                <Typography color="text.secondary">
-                  {tracker.hasTodayEntries
-                    ? `${minutesToHoursLabel(summary.breakMinutes)} em pausas registradas hoje.`
-                    : "Nenhum ponto registrado hoje ainda."}
+        <MotionCard
+          variants={fadeUp}
+          sx={{
+            bgcolor: "rgba(255,255,255,0.72)",
+            borderColor: "#e3e5ec",
+            borderRadius: "22px",
+            boxShadow: "0 18px 36px rgba(28, 37, 65, 0.06)",
+            overflow: "hidden",
+          }}
+        >
+          <CardContent sx={{ p: 0 }}>
+            <Stack
+              direction="row"
+              sx={{
+                alignItems: "center",
+                bgcolor: "rgba(255,255,255,0.62)",
+                borderBottom: "1px solid #e8ebf1",
+                justifyContent: "space-between",
+                px: { xs: 1.35, sm: 1.55 },
+                py: 1.05,
+              }}
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: "1rem", fontWeight: 900, lineHeight: 1.12 }}>
+                  Hoje
                 </Typography>
+                <Typography sx={{ color: "#707682", fontSize: "0.73rem", fontWeight: 760, mt: 0.15 }}>
+                  {formatWeekdayShortPtBr(summary.date)} · {formatDatePtBr(summary.date)}
+                </Typography>
+              </Box>
+              <Chip
+                icon={<AccessTimeRoundedIcon />}
+                label={statusChipLabel}
+                sx={{
+                  bgcolor: "#ffffff",
+                  border: "1px solid #e2e7ef",
+                  borderRadius: "999px",
+                  color: "#657083",
+                  flexShrink: 0,
+                  fontWeight: 850,
+                  height: 30,
+                  "& .MuiChip-icon": { color: "#78c9f2", fontSize: 18 },
+                }}
+              />
+            </Stack>
 
-                {tracker.error && <Alert severity="error">{tracker.error}</Alert>}
-
-                <LayoutGroup>
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: "stretch" }}>
-                    {tracker.nextEntryType && tracker.nextEntryType !== "pause" ? (
-                      <motion.div layoutId="primary-clock-action" style={{ flex: 1 }}>
-                        <Button
-                          fullWidth
-                          size="large"
-                          variant="contained"
-                          disabled={tracker.state === "loading"}
-                          onClick={primaryActionClosesDay ? onOpenDirectClose : onOpenEntry}
-                          component={motion.button}
-                          whileTap={{ scale: 0.97 }}
-                          sx={{
-                            borderRadius: "12px",
-                            minHeight: 48,
-                            background: tone.gradient,
-                            fontWeight: 900,
-                          }}
-                        >
-                          {tracker.state === "loading" ? "Salvando..." : buttonLabel}
-                        </Button>
-                      </motion.div>
-                    ) : (
-                      <motion.div layoutId="primary-clock-action" style={{ flex: 1 }}>
-                        <Chip
-                          label="Dia registrado"
-                          sx={{
-                            width: "100%",
-                            height: 48,
-                            fontWeight: 900,
-                            fontSize: "0.95rem",
-                            borderRadius: "12px",
-                            background: tone.gradient,
-                            color: "#ffffff",
-                            animation: "gentlePulse 2.4s ease-in-out infinite",
-                          }}
-                        />
-                      </motion.div>
-                    )}
-                    <Button
-                      size="large"
-                      color="secondary"
-                      variant="outlined"
-                      disabled={tracker.state === "loading"}
-                      onClick={onOpenBreak}
-                      component={motion.button}
-                      whileTap={{ scale: 0.97 }}
-                      sx={{
-                        borderRadius: "12px",
-                        minWidth: { sm: 118 },
-                        bgcolor: "rgba(22, 163, 74, 0.08)",
-                      }}
-                    >
-                      Pausa
-                    </Button>
-                    {showDirectClose && (
-                      <Button
-                        size="large"
-                        color="warning"
-                        variant="outlined"
-                        disabled={tracker.state === "loading"}
-                        onClick={onOpenDirectClose}
-                        component={motion.button}
-                        whileTap={{ scale: 0.97 }}
-                        sx={{ minWidth: { sm: 118 }, borderRadius: "12px" }}
-                      >
-                        Encerrar
-                      </Button>
-                    )}
-                  </Stack>
-                </LayoutGroup>
-              </Stack>
-            </Box>
-          </CardContent>
-        </MotionCard>
-
-        <MotionCard variants={fadeUp}>
-          <CardContent sx={{ p: 2 }}>
-            <Stack spacing={1.2}>
-              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-                <Typography sx={{ fontWeight: 900 }}>Linha do dia</Typography>
-                <Chip
-                  label={bankLabel}
-                  size="small"
+            <Stack spacing={1.05} sx={{ px: { xs: 1.35, sm: 1.55 }, py: 1.25 }}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                sx={{
+                  alignItems: "stretch",
+                  justifyContent: "space-between",
+                  gap: 1,
+                }}
+              >
+                <Box
                   sx={{
-                    bgcolor: tracker.hourBankBalance >= 0 ? "#dcfce7" : "#ffe4e6",
-                    color: tracker.hourBankBalance >= 0 ? "#166534" : "#9f1239",
-                    fontWeight: 900,
+                    bgcolor: "#ffffff",
+                    border: "1px solid #e7eaf1",
+                    borderRadius: "16px",
+                    flex: 1,
+                    overflow: "hidden",
+                    p: 1.05,
                   }}
-                />
-              </Stack>
-              <BalanceFlowChart values={flowSeries} positive={tracker.hourBankBalance >= 0} />
-              {summaryRecords.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  Assim que você registrar ponto ou pausa, sua linha do tempo aparece aqui.
-                </Typography>
-              ) : (
-                <Stack spacing={0.8}>
-                  {summaryRecords.map((item, index) => (
-                    <Box
-                      component={motion.div}
-                      key={item.id}
-                      initial={{ opacity: 0, x: 14 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: false, amount: 0.55 }}
-                      transition={{ duration: 0.22, delay: index * 0.05 }}
+                >
+                  <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                    <Box>
+                      <Typography sx={{ color: "#707682", fontSize: "0.72rem", fontWeight: 780 }}>
+                        Total de hoje
+                      </Typography>
+                      <Typography sx={{ fontSize: "1.06rem", fontWeight: 900, lineHeight: 1.15, mt: 0.25 }}>
+                        {statusLabels[summary.status]}
+                      </Typography>
+                    </Box>
+                    <Typography
                       sx={{
-                        borderRadius: "12px",
-                        border: `1px solid ${nanaColors.line}`,
-                        px: 1.1,
-                        py: 0.75,
-                        bgcolor: "#ffffff",
+                        color: "#111827",
+                        fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+                        fontSize: { xs: "1.95rem", sm: "2.12rem" },
+                        fontWeight: 900,
+                        letterSpacing: 0,
+                        lineHeight: 1,
                       }}
                     >
-                      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-                        <Stack direction="row" spacing={0.7} sx={{ alignItems: "center", minWidth: 0 }}>
-                          <Box
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: "50%",
-                              bgcolor: item.accent,
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Typography sx={{ fontWeight: 800 }} noWrap>
-                            {item.label}
+                      {minutesToClockDisplay(summary.workedMinutes)}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mt: 1 }}>
+                    <Typography sx={{ color: "#707682", fontSize: "0.76rem", fontWeight: 820 }}>
+                      Jornada do dia
+                    </Typography>
+                    <Typography sx={{ color: "#10a36d", fontSize: "0.76rem", fontWeight: 900 }}>
+                      {todayProgress}%
+                    </Typography>
+                  </Stack>
+                  <Box sx={{ bgcolor: "#e4e8ef", borderRadius: "999px", height: 6, mt: 0.55, overflow: "hidden" }}>
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${todayProgress}%` }}
+                      transition={{ duration: motionDuration.slow, ease: motionEasing.emphasized }}
+                      style={{
+                        background: "linear-gradient(90deg, #ffe45c 0%, #78c9f2 52%, #10a36d 100%)",
+                        borderRadius: 999,
+                        height: "100%",
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                <Box
+                  sx={{
+                    display: "grid",
+                    gap: 0.65,
+                    gridTemplateColumns: { xs: "repeat(3, minmax(0, 1fr))", sm: "1fr" },
+                    minWidth: { sm: 128 },
+                  }}
+                >
+                  {[
+                    ["Jornada", selectedWorkedLabel, "#ffe45c"],
+                    ["Pausas", minutesToHoursLabel(summary.breakMinutes), "#e579ef"],
+                    ["Banco", bankLabel, "#78c9f2"],
+                  ].map(([label, value, color]) => (
+                    <Box
+                      key={label}
+                      sx={{
+                        bgcolor: "#ffffff",
+                        border: "1px solid #e7eaf1",
+                        borderRadius: "13px",
+                        minWidth: 0,
+                        px: 0.85,
+                        py: 0.65,
+                      }}
+                    >
+                      <Stack direction="row" spacing={0.45} sx={{ alignItems: "center", minWidth: 0 }}>
+                        <Box sx={{ bgcolor: color, borderRadius: "999px", height: 16, width: 3, flexShrink: 0 }} />
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ color: "#707682", fontSize: "0.68rem", fontWeight: 780, lineHeight: 1.1 }} noWrap>
+                            {label}
                           </Typography>
-                        </Stack>
-                        <Typography variant="caption" sx={{ color: item.accent, fontWeight: 900 }}>
-                          {item.time}
-                        </Typography>
+                          <Typography sx={{ fontSize: "0.86rem", fontWeight: 900, lineHeight: 1.25, mt: 0.15 }} noWrap>
+                            {value}
+                          </Typography>
+                        </Box>
                       </Stack>
                     </Box>
                   ))}
-                </Stack>
-              )}
+                </Box>
+              </Stack>
+
+              <Typography sx={{ color: "#707682", fontSize: "0.78rem", fontWeight: 720, lineHeight: 1.3 }}>
+                {tracker.hasTodayEntries
+                  ? `${selectedRangeLabel} · ${selectedBreakLabel}`
+                  : "Nenhum ponto registrado hoje ainda."}
+              </Typography>
+            </Stack>
+
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={0.8}
+              sx={{
+                bgcolor: "rgba(245,247,251,0.78)",
+                borderTop: "1px solid #e8ebf1",
+                px: { xs: 1.35, sm: 1.55 },
+                py: 1.05,
+              }}
+            >
+                {isPrimaryActionAvailable ? (
+                  <Button
+                    fullWidth
+                    disabled={tracker.state === "loading"}
+                    onClick={primaryActionClosesDay ? onOpenDirectClose : onOpenEntry}
+                    startIcon={primaryActionClosesDay ? <StopCircleRoundedIcon /> : <PlayArrowRoundedIcon />}
+                    sx={{
+                      bgcolor: "#5f6f8a",
+                      borderRadius: "12px",
+                      color: "#ffffff",
+                      fontWeight: 900,
+                      minHeight: 42,
+                      "&:hover": { bgcolor: "#52617a" },
+                    }}
+                    variant="contained"
+                  >
+                    {tracker.state === "loading" ? "Salvando..." : primaryButtonLabel}
+                  </Button>
+                ) : (
+                  <Chip
+                    icon={<CheckCircleRoundedIcon />}
+                    label="Dia registrado"
+                    sx={{
+                      bgcolor: "#0f766e",
+                      borderRadius: "12px",
+                      color: "#ffffff",
+                      flex: 1,
+                      fontWeight: 900,
+                      height: 42,
+                      "& .MuiChip-icon": { color: "#ffffff" },
+                    }}
+                  />
+                )}
+                <Button
+                  disabled={tracker.state === "loading"}
+                  onClick={onOpenBreak}
+                  startIcon={<CoffeeRoundedIcon />}
+                  sx={{
+                    borderColor: "#10a36d",
+                    borderRadius: "12px",
+                    color: "#07936b",
+                    fontWeight: 900,
+                    minHeight: 42,
+                    minWidth: { sm: 118 },
+                    "&:hover": {
+                      borderColor: "#07936b",
+                      bgcolor: "rgba(16, 163, 109, 0.08)",
+                    },
+                  }}
+                  variant="outlined"
+                >
+                  Pausa
+                </Button>
+                {showDirectClose && !primaryActionClosesDay && (
+                  <Button
+                    disabled={tracker.state === "loading"}
+                    onClick={onOpenDirectClose}
+                    startIcon={<StopCircleRoundedIcon />}
+                    sx={{
+                      borderRadius: "12px",
+                      fontWeight: 900,
+                      minHeight: 42,
+                      minWidth: { sm: 118 },
+                    }}
+                    color="warning"
+                    variant="outlined"
+                  >
+                    Encerrar
+                  </Button>
+                )}
             </Stack>
           </CardContent>
         </MotionCard>
 
-        <SummaryGrid
-          items={[
-            [
-              "Semana",
-              tracker.hasWeekEntries
-                ? minutesToHoursLabel(tracker.weekWorkedMinutes)
-                : "Sem registros",
-              "Horas registradas",
-            ],
-            ["Saldo semanal", weekDeltaLabel, weekDeltaCaption],
-            ["Banco", bankLabel, "Movimentos lançados"],
-          ]}
-        />
+        <MotionCard
+          variants={fadeUp}
+          sx={{
+            bgcolor: "rgba(255,255,255,0.72)",
+            borderColor: "#e3e5ec",
+            borderRadius: "22px",
+            boxShadow: "0 18px 36px rgba(28, 37, 65, 0.06)",
+          }}
+        >
+          <CardContent sx={{ p: { xs: 1.45, sm: 1.7 } }}>
+            <Stack spacing={1.2}>
+              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: "1.12rem", fontWeight: 900 }}>
+                  Progresso
+                </Typography>
+                <Chip
+                  deleteIcon={<ExpandMoreRoundedIcon />}
+                  label="Semanal"
+                  onDelete={() => undefined}
+                  sx={{
+                    bgcolor: "#ffffff",
+                    border: "1px solid #eceef4",
+                    borderRadius: "999px",
+                    fontWeight: 800,
+                    height: 28,
+                    pr: 0.2,
+                    "& .MuiChip-deleteIcon": {
+                      bgcolor: "#e579ef",
+                      borderRadius: "50%",
+                      color: "#ffffff",
+                      fontSize: 18,
+                      mr: 0.2,
+                    },
+                  }}
+                />
+              </Stack>
+              <Stack
+                direction="row"
+                sx={{
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1,
+                }}
+              >
+                <Stack spacing={1.05} sx={{ minWidth: 0 }}>
+                  {progressMetrics.map((metric) => (
+                    <Stack direction="row" key={metric.label} spacing={0.8} sx={{ alignItems: "center" }}>
+                      <Box
+                        sx={{
+                          bgcolor: metric.color,
+                          borderRadius: "999px",
+                          height: 26,
+                          width: 3,
+                        }}
+                      />
+                      <Box>
+                        <Typography sx={{ color: "#6f7480", fontSize: "0.73rem", fontWeight: 760, lineHeight: 1.1 }}>
+                          {metric.label}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.82rem", fontWeight: 900, lineHeight: 1.2 }}>
+                          {metric.meta}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  ))}
+                </Stack>
+                <ActivityProgressRings metrics={progressMetrics} />
+              </Stack>
+              <Divider />
+              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                <Typography sx={{ color: "#707682", fontSize: "0.78rem", fontWeight: 760 }}>
+                  {activeDays} dias ativos
+                </Typography>
+                <Typography sx={{ color: "#707682", fontSize: "0.78rem", fontWeight: 760 }}>
+                  {completedDays} concluídos
+                </Typography>
+              </Stack>
+            </Stack>
+          </CardContent>
+        </MotionCard>
+
+        {tracker.error && <Alert severity="error">{tracker.error}</Alert>}
+
+        <Stack spacing={1.2}>
+          <Typography sx={{ fontSize: "1.45rem", fontWeight: 900, letterSpacing: 0 }}>
+            Atividades
+          </Typography>
+          <Stack direction="row" spacing={0.75} sx={{ overflowX: "auto", pb: 0.2 }}>
+            {["Tudo", "Jornada", "Pausas", "Banco"].map((label, index) => (
+              <Chip
+                key={label}
+                label={label}
+                sx={{
+                  bgcolor: index === 1 ? "#ffe96b" : "#ffffff",
+                  border: "1px solid #e6e8ef",
+                  borderRadius: "999px",
+                  color: "#111827",
+                  flexShrink: 0,
+                  fontWeight: 800,
+                  height: 36,
+                  px: 0.6,
+                }}
+              />
+            ))}
+          </Stack>
+
+          <Stack spacing={1}>
+            {taskCards.map((task) => (
+              <Box
+                component={motion.button}
+                disabled={task.disabled}
+                key={task.label}
+                onClick={task.onClick}
+                type="button"
+                whileHover={task.disabled ? undefined : { y: -2 }}
+                whileTap={task.disabled ? undefined : { scale: 0.985 }}
+                sx={{
+                  alignItems: "center",
+                  bgcolor: "#ffffff",
+                  border: "1px solid #e8eaf1",
+                  borderRadius: "18px",
+                  boxShadow: "0 12px 24px rgba(28, 37, 65, 0.055)",
+                  color: "#111827",
+                  cursor: task.disabled ? "default" : "pointer",
+                  display: "grid",
+                  font: "inherit",
+                  gap: 1,
+                  gridTemplateColumns: "44px minmax(0, 1fr) 42px 18px",
+                  minHeight: 72,
+                  opacity: task.disabled ? 0.72 : 1,
+                  p: 1,
+                  textAlign: "left",
+                  width: "100%",
+                }}
+              >
+                <Box
+                  sx={{
+                    alignItems: "center",
+                    bgcolor: task.bg,
+                    border: `2px solid ${task.accent}`,
+                    borderRadius: "50%",
+                    color: "#111827",
+                    display: "flex",
+                    height: 42,
+                    justifyContent: "center",
+                    width: 42,
+                  }}
+                >
+                  {task.icon}
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "0.86rem", fontWeight: 900, lineHeight: 1.15 }} noWrap>
+                    {task.label}
+                  </Typography>
+                  <Typography sx={{ color: "#6f7480", fontSize: "0.73rem", fontWeight: 650, mt: 0.35 }} noWrap>
+                    {task.meta}
+                  </Typography>
+                </Box>
+                <Typography sx={{ fontSize: "0.78rem", fontWeight: 900, justifySelf: "end" }}>
+                  {task.percent}%
+                </Typography>
+                <ChevronRightRoundedIcon sx={{ color: "#111827", fontSize: 20 }} />
+              </Box>
+            ))}
+          </Stack>
+        </Stack>
       </Stack>
     </motion.section>
   );
@@ -1284,25 +1752,14 @@ function TodayView({
 
 function SummaryGrid({ items }: { items: [string, string, string][] }) {
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.2 }}>
+    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.1 }}>
       {items.map(([title, value, caption]) => (
-        <MotionCard
-          key={title}
-          variants={fadeUp}
-          whileHover={{ y: -3, rotateZ: -0.15 }}
-          transition={{ duration: motionDuration.fast, ease: motionEasing.overshoot }}
-        >
-          <CardContent
-            sx={{
-              p: 1.5,
-              background:
-                "linear-gradient(160deg, rgba(255,255,255,0.96) 0%, rgba(239,246,255,0.75) 100%)",
-            }}
-          >
-            <Typography variant="caption" color="text.secondary">
+        <MotionCard key={title} variants={fadeUp}>
+          <CardContent sx={{ p: 1.2, bgcolor: "#ffffff" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
               {title}
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 900 }}>
+            <Typography sx={{ fontWeight: 900, lineHeight: 1.15, mt: 0.15 }}>
               {value}
             </Typography>
             <Typography variant="caption" color="text.secondary">
