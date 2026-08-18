@@ -349,7 +349,7 @@ describe("time calculations", () => {
     expect(movements[0].details?.at(4)?.workedMinutes).toBe(0);
   });
 
-  it("credits a completed short Friday without charging its daily target", () => {
+  it("keeps the 30 hour weekly target when a short Friday is completed", () => {
     const movements = calculateAutomaticWeeklyBankMovements(
       [
         summarizeDay({
@@ -394,7 +394,48 @@ describe("time calculations", () => {
     );
 
     expect(movements).toHaveLength(1);
-    expect(movements[0].minutesDelta).toBe(750);
+    expect(movements[0].minutesDelta).toBe(390);
+  });
+
+  it("debits 90 minutes after three eight-hour days and Thursday morning", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-05-18",
+          entries: [
+            entry("monday-arrival", "arrival", "2026-05-18T08:00:00-03:00"),
+            entry("monday-departure", "departure", "2026-05-18T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-19",
+          entries: [
+            entry("tuesday-arrival", "arrival", "2026-05-19T08:00:00-03:00"),
+            entry("tuesday-departure", "departure", "2026-05-19T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-20",
+          entries: [
+            entry("wednesday-arrival", "arrival", "2026-05-20T08:00:00-03:00"),
+            entry("wednesday-departure", "departure", "2026-05-20T16:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-05-21",
+          entries: [
+            entry("thursday-arrival", "arrival", "2026-05-21T07:30:00-03:00"),
+            entry("thursday-departure", "departure", "2026-05-21T12:00:00-03:00"),
+          ],
+          mark: mark("thursday-completed", "2026-05-21", "completed"),
+        }),
+      ],
+      undefined,
+      new Date("2026-05-25T09:00:00-03:00"),
+    );
+
+    expect(movements).toHaveLength(1);
+    expect(movements[0].minutesDelta).toBe(-90);
   });
 
   it("keeps the daily target when an eight-hour day was marked completed", () => {
@@ -445,7 +486,7 @@ describe("time calculations", () => {
     expect(movements[0].minutesDelta).toBe(120);
   });
 
-  it("matches the reported accumulated bank balance with completed Fridays", () => {
+  it("keeps completed short days inside the accumulated weekly target", () => {
     const movements = calculateAutomaticWeeklyBankMovements(
       [
         summarizeDay({
@@ -557,10 +598,10 @@ describe("time calculations", () => {
     );
 
     expect(movements).toHaveLength(3);
-    expect(calculateHourBankBalance(movements)).toBe(1890);
+    expect(calculateHourBankBalance(movements)).toBe(1170);
     expect(movements.find((movement) => movement.date === "2026-05-03")?.minutesDelta).toBe(510);
-    expect(movements.find((movement) => movement.date === "2026-05-10")?.minutesDelta).toBe(630);
-    expect(movements.find((movement) => movement.date === "2026-05-17")?.minutesDelta).toBe(750);
+    expect(movements.find((movement) => movement.date === "2026-05-10")?.minutesDelta).toBe(270);
+    expect(movements.find((movement) => movement.date === "2026-05-17")?.minutesDelta).toBe(390);
   });
 
   it("does not create weekly debit when the missing day is a holiday", () => {

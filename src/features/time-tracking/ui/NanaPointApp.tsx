@@ -1147,6 +1147,12 @@ function TodayView({
   const bankProgress = tracker.hasHourBankMovements
     ? clampPercent((Math.abs(tracker.hourBankBalance) / 360) * 100)
     : 0;
+  const weekBalanceLabel =
+    tracker.weekReferenceDelta < 0
+      ? `faltam ${minutesToHoursLabel(Math.abs(tracker.weekReferenceDelta))}`
+      : tracker.weekReferenceDelta > 0
+        ? `${minutesToHoursLabel(tracker.weekReferenceDelta)} extras`
+        : "meta atingida";
   const progressMetrics = [
     {
       color: "#ffe45c",
@@ -1157,7 +1163,7 @@ function TodayView({
     {
       color: "#78c9f2",
       label: "Semana",
-      meta: `${weekProgress}% · ${minutesToHoursLabel(tracker.weekWorkedMinutes)}`,
+      meta: `${weekProgress}% · ${minutesToHoursLabel(tracker.weekWorkedMinutes)} · ${weekBalanceLabel}`,
       percent: weekProgress,
     },
     {
@@ -1975,7 +1981,7 @@ function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
   }
 
   if (isCompletedWithoutDailyTarget(day)) {
-    return { label: "Saldo semanal", bg: "#ffffff", border: "#eee9df", accent: "#047857", chip: "#dcfce7" };
+    return { label: "Concluído", bg: "#ffffff", border: "#eee9df", accent: "#047857", chip: "#dcfce7" };
   }
 
   if (!hasCalendarDayActivity(day)) {
@@ -2014,16 +2020,6 @@ function getCalendarBalanceIndicator(day: CalendarDayItem) {
 
   if (!hasCalendarDayActivity(day) || hasBlockingMark || day.status === "pending") {
     return null;
-  }
-
-  if (isCompletedWithoutDailyTarget(day) && day.workedMinutes > 0) {
-    return {
-      direction: "up" as const,
-      label: `+${minutesToHoursLabel(day.workedMinutes)}`,
-      accent: "#10b981",
-      bg: "#ecfdf5",
-      border: "#a7f3d0",
-    };
   }
 
   if (day.balanceMinutes > 0) {
@@ -2709,7 +2705,7 @@ function DayPopoverContent({
   const isCompleted = isCompletedWithoutDailyTarget(day);
   const balanceLabel =
     isCompleted
-      ? `+${minutesToHoursLabel(day.workedMinutes)}`
+      ? `${minutesToHoursLabel(day.workedMinutes)} trabalhadas`
     : day.balanceMinutes === 0
       ? "0min"
       : minutesToHoursLabel(day.balanceMinutes);
@@ -3026,7 +3022,7 @@ function DayPopoverContent({
             />
             <PopoverMetric
               color={isCompleted ? "#047857" : day.balanceMinutes < 0 ? "#d97706" : "#4f46e5"}
-              label={isCompleted ? "Saldo semanal" : "Saldo"}
+              label={isCompleted ? "Para as 30h" : "Saldo"}
               surface={isCompleted ? "#ecfdf5" : day.balanceMinutes < 0 ? "#fff7ed" : "#eef2ff"}
               value={balanceLabel}
             />
@@ -3897,7 +3893,7 @@ function getHourBankDayTone(day: DailySummary) {
 
   if (isCompletedWithoutDailyTarget(day)) {
     return {
-      label: "Saldo semanal",
+      label: "Concluído",
       accent: "#047857",
       badge: "#dcfce7",
     };
@@ -3938,7 +3934,7 @@ function HourBankDayTile({ day, index }: { day: DailySummary; index: number }) {
   const tone = getHourBankDayTone(day);
   const balanceLabel =
     isCompletedWithoutDailyTarget(day)
-      ? `Saldo semanal +${minutesToHoursLabel(day.workedMinutes)}`
+      ? `${minutesToHoursLabel(day.workedMinutes)} contabilizadas nas 30h`
       : day.balanceMinutes === 0
         ? "Saldo 0min"
         : `Saldo ${minutesToHoursLabel(day.balanceMinutes)}`;
@@ -4068,7 +4064,7 @@ function getHourBankDetailLabel(day: DailySummary) {
   }
 
   if (isCompletedWithoutDailyTarget(day)) {
-    return `Dia concluÃ­do Â· ${minutesToHoursLabel(day.workedMinutes)} entram no saldo semanal`;
+    return `Dia concluído · ${minutesToHoursLabel(day.workedMinutes)} contabilizadas nas 30h semanais`;
   }
 
   if (day.entries.length === 0 && day.breaks.length === 0) {

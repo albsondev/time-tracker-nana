@@ -5,11 +5,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   calculateAutomaticWeeklyBankMovements,
   calculateHourBankBalance,
+  calculateWeeklyExpectedMinutes,
   DAILY_REFERENCE_MINUTES,
   getNextEntryType,
   isCompletedWithoutDailyTarget,
   summarizeDay,
-  WEEKLY_EXPECTED_MINUTES,
 } from "@/domain/time/calculations";
 import { toDateKey } from "@/domain/time/format";
 import { getNationalHoliday } from "@/domain/time/holidays";
@@ -342,22 +342,7 @@ export function useTimeTracker(params: {
   );
 
   const weekExpectedMinutes = useMemo(
-    () =>
-      Math.min(
-        WEEKLY_EXPECTED_MINUTES,
-        weekDailySummaries.reduce(
-          (total, day) => {
-            const isNonWorkingDay =
-              day.mark?.type === "holiday" ||
-              day.mark?.type === "excluded" ||
-              day.mark?.type === "medical_leave" ||
-              isCompletedWithoutDailyTarget(day);
-
-            return total + (isNonWorkingDay ? 0 : DAILY_REFERENCE_MINUTES);
-          },
-          0,
-        ),
-      ),
+    () => calculateWeeklyExpectedMinutes(weekDailySummaries),
     [weekDailySummaries],
   );
 
@@ -456,7 +441,8 @@ export function useTimeTracker(params: {
         userId: params.userId,
         date: entryDate,
         type: "completed",
-        note: "Expediente encerrado manualmente: dia concluído sem débito.",
+        note:
+          "Expediente encerrado: alerta diário concluído; horas mantidas no total semanal.",
       });
     }
     await reload();
@@ -542,7 +528,8 @@ export function useTimeTracker(params: {
         userId: params.userId,
         date: nextDate,
         type: "completed",
-        note: "Expediente encerrado manualmente: dia concluído sem débito.",
+        note:
+          "Expediente encerrado: alerta diário concluído; horas mantidas no total semanal.",
       });
     }
     await reload();
@@ -556,7 +543,8 @@ export function useTimeTracker(params: {
       userId: params.userId,
       date,
       type: "completed",
-      note: "Dia marcado como concluído: não gera débito de horas.",
+      note:
+        "Dia marcado como concluído: sem alerta diário; horas mantidas no total semanal.",
     });
     await reload();
   }
