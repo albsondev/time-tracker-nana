@@ -472,7 +472,7 @@ export function NanaPointApp() {
     <Box
       sx={{
         minHeight: "100dvh",
-        background: "linear-gradient(180deg, #f7f7fc 0%, #eef0f7 100%)",
+        bgcolor: "#f3efe5",
         pb: "calc(92px + env(safe-area-inset-bottom))",
       }}
     >
@@ -5031,7 +5031,7 @@ function BottomAppNavigation({
         bottom: 0,
         pointerEvents: "none",
         background:
-          "linear-gradient(180deg, rgba(247,247,252,0) 0%, rgba(247,247,252,0.92) 48%, #f7f7fc 100%)",
+          "linear-gradient(180deg, rgba(243,239,229,0) 0%, rgba(243,239,229,0.92) 48%, #f3efe5 100%)",
         px: { xs: 0.75, sm: 1.5 },
         pt: { xs: 1.25, sm: 1.5 },
         pb: "max(8px, env(safe-area-inset-bottom))",
