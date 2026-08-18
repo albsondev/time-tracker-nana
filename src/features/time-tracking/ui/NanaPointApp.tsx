@@ -32,8 +32,6 @@ import {
   Alert,
   AppBar,
   Box,
-  BottomNavigation,
-  BottomNavigationAction,
   Button,
   Card,
   CardContent,
@@ -92,6 +90,29 @@ import { useTimeTracker } from "../model/use-time-tracker";
 
 type Tab = "today" | "calendar" | "bank" | "history" | "profile";
 
+const bottomAppNavigationItems: ReadonlyArray<{
+  accent: string;
+  icon: ReactNode;
+  label: string;
+  value: Tab;
+}> = [
+  { value: "today", label: "Hoje", icon: <HomeRoundedIcon />, accent: "#ffe45c" },
+  {
+    value: "calendar",
+    label: "Calendário",
+    icon: <CalendarMonthRoundedIcon />,
+    accent: "#78c9f2",
+  },
+  { value: "bank", label: "Banco", icon: <SavingsRoundedIcon />, accent: "#e579ef" },
+  {
+    value: "history",
+    label: "Histórico",
+    icon: <InsightsRoundedIcon />,
+    accent: "#6ee7b7",
+  },
+  { value: "profile", label: "Perfil", icon: <PersonRoundedIcon />, accent: "#ffffff" },
+];
+
 type EditTarget =
   | { kind: "time"; entry: TimeEntry }
   | { kind: "break"; entry: BreakEntry };
@@ -138,7 +159,7 @@ const breakLabels: Record<BreakCategory, string> = {
   other: "Outro",
 };
 
-const MotionCard = motion(Card);
+const MotionCard = motion.create(Card);
 
 function getDisplayName(session: Session | null) {
   const metadataName = session?.user.user_metadata?.display_name;
@@ -452,7 +473,7 @@ export function NanaPointApp() {
       sx={{
         minHeight: "100dvh",
         background: "linear-gradient(180deg, #f7f7fc 0%, #eef0f7 100%)",
-        pb: 11,
+        pb: "calc(92px + env(safe-area-inset-bottom))",
       }}
     >
       <Container
@@ -514,7 +535,11 @@ export function NanaPointApp() {
         </AnimatePresence>
       </Container>
 
-      <BottomAppNavigation tab={tab} onChange={setTab} />
+      <BottomAppNavigation
+        tab={tab}
+        shouldReduceMotion={Boolean(shouldReduceMotion)}
+        onChange={setTab}
+      />
       <EntryDialog
         open={entryDialogOpen}
         onClose={() => setEntryDialogOpen(false)}
@@ -4987,59 +5012,170 @@ function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) 
 
 function BottomAppNavigation({
   tab,
+  shouldReduceMotion,
   onChange,
 }: {
   tab: Tab;
+  shouldReduceMotion: boolean;
   onChange: (tab: Tab) => void;
 }) {
   return (
     <AppBar
+      component="nav"
+      aria-label="Navegação principal"
       position="fixed"
       color="transparent"
       elevation={0}
-      sx={{ top: "auto", bottom: 0, p: { xs: 1, sm: 1.5 }, backdropFilter: "blur(22px)" }}
+      sx={{
+        top: "auto",
+        bottom: 0,
+        pointerEvents: "none",
+        background:
+          "linear-gradient(180deg, rgba(247,247,252,0) 0%, rgba(247,247,252,0.92) 48%, #f7f7fc 100%)",
+        px: { xs: 0.75, sm: 1.5 },
+        pt: { xs: 1.25, sm: 1.5 },
+        pb: "max(8px, env(safe-area-inset-bottom))",
+      }}
     >
-      <BottomNavigation
-        value={tab}
-        onChange={(_, next) => onChange(next)}
-        showLabels
+      <Box
+        component={motion.div}
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: shouldReduceMotion ? 0 : motionDuration.medium,
+          ease: motionEasing.standard,
+        }}
         sx={{
           width: "100%",
-          maxWidth: 520,
+          maxWidth: 540,
           mx: "auto",
-          borderRadius: 14,
-          border: "1px solid rgba(148, 163, 184, 0.4)",
-          background:
-            "linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(239,246,255,0.9) 100%)",
-          boxShadow: "0 22px 48px rgba(15, 23, 42, 0.2)",
-          px: { xs: 0.5, sm: 1 },
-          "& .MuiBottomNavigationAction-root": {
-            minWidth: 0,
-            maxWidth: "none",
-            px: { xs: 0.4, sm: 1 },
-            py: { xs: 0.5, sm: 0.75 },
-            borderRadius: 10,
-            transition: "all 180ms cubic-bezier(0.2, 0, 0, 1)",
-          },
-          "& .Mui-selected": {
-            background: "rgba(37, 99, 235, 0.12)",
-            color: "#1d4ed8",
-          },
-          "& .MuiBottomNavigationAction-label": {
-            fontSize: { xs: "0.62rem", sm: "0.72rem" },
-            fontWeight: 700,
-          },
-          "& .MuiSvgIcon-root": {
-            fontSize: { xs: "1.15rem", sm: "1.35rem" },
-          },
+          display: "grid",
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          gap: { xs: 0.2, sm: 0.35 },
+          borderRadius: { xs: "19px", sm: "20px" },
+          border: "1px solid rgba(218,220,224,0.88)",
+          bgcolor: "rgba(255,255,255,0.9)",
+          boxShadow:
+            "inset 0 1px 0 rgba(255,255,255,0.96), 0 2px 8px rgba(17,24,39,0.06), 0 14px 34px rgba(17,24,39,0.13)",
+          backdropFilter: "blur(20px) saturate(145%)",
+          WebkitBackdropFilter: "blur(20px) saturate(145%)",
+          isolation: "isolate",
+          p: 0.45,
+          pointerEvents: "auto",
         }}
       >
-        <BottomNavigationAction label="Hoje" value="today" icon={<HomeRoundedIcon />} />
-        <BottomNavigationAction label="Calendário" value="calendar" icon={<CalendarMonthRoundedIcon />} />
-        <BottomNavigationAction label="Banco" value="bank" icon={<SavingsRoundedIcon />} />
-        <BottomNavigationAction label="Histórico" value="history" icon={<InsightsRoundedIcon />} />
-        <BottomNavigationAction label="Perfil" value="profile" icon={<PersonRoundedIcon />} />
-      </BottomNavigation>
+        {bottomAppNavigationItems.map((item) => {
+          const isActive = item.value === tab;
+
+          return (
+            <Box
+              component={motion.button}
+              key={item.value}
+              type="button"
+              aria-current={isActive ? "page" : undefined}
+              aria-label={`Abrir ${item.label}`}
+              onClick={() => onChange(item.value)}
+              whileHover={shouldReduceMotion ? undefined : { y: -1 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+              transition={springy}
+              sx={{
+                appearance: "none",
+                alignItems: "center",
+                bgcolor: "transparent",
+                border: 0,
+                borderRadius: { xs: "14px", sm: "15px" },
+                color: isActive ? "#ffffff" : "#707682",
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                font: "inherit",
+                gap: 0.15,
+                justifyContent: "center",
+                minHeight: { xs: 50, sm: 52 },
+                minWidth: 0,
+                overflow: "hidden",
+                p: { xs: "4px 2px 5px", sm: "5px 5px 6px" },
+                position: "relative",
+                WebkitTapHighlightColor: "transparent",
+                transition:
+                  "color 160ms cubic-bezier(0.2, 0, 0, 1), background-color 160ms cubic-bezier(0.2, 0, 0, 1)",
+                "&:hover": {
+                  bgcolor: isActive ? "transparent" : "rgba(17,24,39,0.045)",
+                  color: isActive ? "#ffffff" : "#111827",
+                },
+                "&:focus-visible": {
+                  outline: "2px solid rgba(120,201,242,0.82)",
+                  outlineOffset: 2,
+                },
+              }}
+            >
+              {isActive ? (
+                <Box
+                  component={motion.span}
+                  layoutId="bottom-navigation-active"
+                  transition={
+                    shouldReduceMotion
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 420, damping: 34, mass: 0.84 }
+                  }
+                  sx={{
+                    position: "absolute",
+                    inset: 1,
+                    border: "1px solid #15171b",
+                    borderRadius: "inherit",
+                    background:
+                      "radial-gradient(circle at 82% 0%, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0) 32%), #050505",
+                    boxShadow:
+                      "inset 0 1px 0 rgba(255,255,255,0.12), 0 5px 14px rgba(5,5,5,0.18)",
+                    zIndex: 0,
+                  }}
+                />
+              ) : null}
+
+              <Box
+                component={motion.span}
+                animate={{
+                  color: isActive ? item.accent : "#707682",
+                  y: isActive && !shouldReduceMotion ? -0.5 : 0,
+                }}
+                transition={{ duration: shouldReduceMotion ? 0 : motionDuration.fast }}
+                sx={{
+                  alignItems: "center",
+                  display: "flex",
+                  height: { xs: 21, sm: 22 },
+                  justifyContent: "center",
+                  position: "relative",
+                  zIndex: 1,
+                  "& .MuiSvgIcon-root": {
+                    fontSize: { xs: "1.18rem", sm: "1.28rem" },
+                  },
+                }}
+              >
+                {item.icon}
+              </Box>
+
+              <Typography
+                component="span"
+                sx={{
+                  color: "inherit",
+                  fontSize: { xs: "clamp(0.53rem, 2.45vw, 0.62rem)", sm: "0.66rem" },
+                  fontWeight: isActive ? 850 : 760,
+                  letterSpacing: isActive ? "0.005em" : 0,
+                  lineHeight: 1,
+                  maxWidth: "100%",
+                  overflow: "hidden",
+                  position: "relative",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  zIndex: 1,
+                }}
+              >
+                {item.label}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
     </AppBar>
   );
 }
