@@ -12,7 +12,7 @@ import {
   summarizeDay,
 } from "@/domain/time/calculations";
 import { toDateKey } from "@/domain/time/format";
-import { getNationalHoliday } from "@/domain/time/holidays";
+import { getDayMarkForDate, getNationalHoliday } from "@/domain/time/holidays";
 import type {
   BreakCategory,
   BreakEntry,
@@ -69,26 +69,6 @@ function getBreaksForDate(breaks: BreakEntry[], date: string) {
   return breaks.filter((entry) => entry.date === date);
 }
 
-function getMarkForDate(marks: DayMark[], date: string) {
-  const excludedMark = marks.find(
-    (mark) => mark.date === date && mark.type === "excluded",
-  );
-
-  if (excludedMark) return excludedMark;
-
-  const medicalLeaveMark = marks.find(
-    (mark) => mark.date === date && mark.type === "medical_leave",
-  );
-
-  if (medicalLeaveMark) return medicalLeaveMark;
-
-  return (
-    marks.find((mark) => mark.date === date && mark.type === "holiday") ??
-    getNationalHoliday(date) ??
-    marks.find((mark) => mark.date === date && mark.type === "completed")
-  );
-}
-
 function summarizeDates(params: {
   dates: string[];
   entries: TimeEntry[];
@@ -101,7 +81,7 @@ function summarizeDates(params: {
       date,
       entries: getEntriesForDate(params.entries, date),
       breaks: getBreaksForDate(params.breaks, date),
-      mark: getMarkForDate(params.marks, date),
+      mark: getDayMarkForDate(params.marks, date),
       now: params.now,
     }),
   );
@@ -114,7 +94,7 @@ function shouldAutoCompleteShortClosedDay(params: {
   marks: DayMark[];
   now: Date;
 }) {
-  const mark = getMarkForDate(params.marks, params.date);
+  const mark = getDayMarkForDate(params.marks, params.date);
 
   if (mark && mark.type !== "completed") return false;
 
@@ -580,34 +560,68 @@ export function useTimeTracker(params: {
     const existingMark = marks.find(
       (mark) => mark.date === date && mark.type === "holiday",
     );
+    const hasWorkingDayOverride = marks.some(
+      (mark) => mark.date === date && mark.type === "working_day",
+    );
+    const isHoliday = getDayMarkForDate(marks, date)?.type === "holiday";
 
     setState("loading");
+    setError(null);
 
-    if (existingMark) {
-      await deleteDayMark(params.supabase, {
-        userId: params.userId,
-        date,
-        type: "holiday",
-      });
-    } else {
-      await deleteDayMark(params.supabase, {
-        userId: params.userId,
-        date,
-        type: "medical_leave",
-      });
-      await deleteDayMark(params.supabase, {
-        userId: params.userId,
-        date,
-        type: "completed",
-      });
-      await upsertDayMark(params.supabase, {
-        userId: params.userId,
-        date,
-        type: "holiday",
-      });
+    try {
+      if (isHoliday) {
+        if (getNationalHoliday(date)) {
+          await upsertDayMark(params.supabase, {
+            userId: params.userId,
+            date,
+            type: "working_day",
+            note: "Dia útil: substitui o feriado nacional automático.",
+          });
+        }
+
+        if (existingMark) {
+          await deleteDayMark(params.supabase, {
+            userId: params.userId,
+            date,
+            type: "holiday",
+          });
+        }
+      } else {
+        await deleteDayMark(params.supabase, {
+          userId: params.userId,
+          date,
+          type: "medical_leave",
+        });
+        await deleteDayMark(params.supabase, {
+          userId: params.userId,
+          date,
+          type: "completed",
+        });
+        await upsertDayMark(params.supabase, {
+          userId: params.userId,
+          date,
+          type: "holiday",
+        });
+
+        if (hasWorkingDayOverride) {
+          await deleteDayMark(params.supabase, {
+            userId: params.userId,
+            date,
+            type: "working_day",
+          });
+        }
+      }
+
+      await reload();
+    } catch (unknownError) {
+      const message =
+        unknownError instanceof Error
+          ? unknownError.message
+          : "Não foi possível atualizar o feriado deste dia.";
+      await reload();
+      setError(message);
+      setState("error");
     }
-
-    await reload();
   }
 
   async function toggleMedicalLeave(date: string) {

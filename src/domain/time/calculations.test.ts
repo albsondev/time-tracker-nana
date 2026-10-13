@@ -8,6 +8,7 @@ import {
   summarizeWeek,
   WEEKLY_EXPECTED_MINUTES,
 } from "./calculations";
+import { getDayMarkForDate } from "./holidays";
 import type { BreakEntry, DayMark, TimeEntry } from "./types";
 
 const userId = "user-test";
@@ -92,6 +93,26 @@ describe("time calculations", () => {
 
     expect(summary.balanceMinutes).toBe(0);
     expect(summary.mark?.type).toBe("holiday");
+  });
+
+  it("counts work on an overridden national holiday toward the daily extra", () => {
+    const date = "2026-10-12";
+    const mark = getDayMarkForDate(
+      [{ id: "workday-1", userId, date, type: "working_day" }],
+      date,
+    );
+    const summary = summarizeDay({
+      date,
+      mark,
+      entries: [
+        entry("arrival", "arrival", "2026-10-12T08:00:00-03:00"),
+        entry("departure", "departure", "2026-10-12T16:00:00-03:00"),
+      ],
+    });
+
+    expect(summary.mark).toBeUndefined();
+    expect(summary.workedMinutes).toBe(8 * 60);
+    expect(summary.balanceMinutes).toBe(2 * 60);
   });
 
   it("ignores a cleared day without deleting its records", () => {

@@ -2149,6 +2149,7 @@ function CalendarView({
 
   return (
     <Stack spacing={2}>
+      {tracker.error && <Alert severity="error">{tracker.error}</Alert>}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         sx={{
@@ -2429,6 +2430,7 @@ function CalendarView({
             onToggleHoliday={onToggleHoliday}
             onToggleExcludedDay={onToggleExcludedDay}
             onToggleMedicalLeave={onToggleMedicalLeave}
+            isSaving={tracker.state === "loading"}
           />
         )}
       </Popover>
@@ -2711,6 +2713,7 @@ function DayPopoverContent({
   onToggleHoliday,
   onToggleExcludedDay,
   onToggleMedicalLeave,
+  isSaving,
 }: {
   day: ReturnType<typeof useTimeTracker>["calendarDays"][number];
   onAddBreak: (date: string) => void;
@@ -2722,6 +2725,7 @@ function DayPopoverContent({
   onToggleHoliday: (date: string) => Promise<void>;
   onToggleExcludedDay: (date: string) => Promise<void>;
   onToggleMedicalLeave: (date: string) => Promise<void>;
+  isSaving: boolean;
 }) {
   const hasRecords = day.entries.length > 0 || day.breaks.length > 0;
   const isHoliday = day.mark?.type === "holiday";
@@ -3272,18 +3276,21 @@ function DayPopoverContent({
                   Feriado
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Marque a data para aparecer nos resumos como feriado.
+                  {isHoliday
+                    ? "Ao remover, a data volta a contar como dia útil."
+                    : "Marque a data para aparecer nos resumos como feriado."}
                 </Typography>
               </Box>
               <Button
                 color={isHoliday ? "warning" : "secondary"}
+                disabled={isSaving}
                 onClick={toggleHoliday}
                 size="small"
                 startIcon={<EventBusyRoundedIcon fontSize="small" />}
                 sx={{ borderRadius: "8px", whiteSpace: "nowrap" }}
                 variant={isHoliday ? "outlined" : "contained"}
               >
-                {isHoliday ? "Remover" : "Marcar"}
+                {isSaving ? "Salvando..." : isHoliday ? "Remover" : "Marcar"}
               </Button>
             </Stack>
           </Box>

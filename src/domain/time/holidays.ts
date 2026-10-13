@@ -73,3 +73,34 @@ export function getNationalHoliday(dateKey: string): DayMark | undefined {
 
   return undefined;
 }
+
+export function getDayMarkForDate(
+  marks: DayMark[],
+  date: string,
+): DayMark | undefined {
+  const excludedMark = marks.find(
+    (mark) => mark.date === date && mark.type === "excluded",
+  );
+
+  if (excludedMark) return excludedMark;
+
+  const medicalLeaveMark = marks.find(
+    (mark) => mark.date === date && mark.type === "medical_leave",
+  );
+
+  if (medicalLeaveMark) return medicalLeaveMark;
+
+  const workingDayOverride = marks.some(
+    (mark) => mark.date === date && mark.type === "working_day",
+  );
+
+  if (workingDayOverride) {
+    return marks.find((mark) => mark.date === date && mark.type === "completed");
+  }
+
+  return (
+    marks.find((mark) => mark.date === date && mark.type === "holiday") ??
+    getNationalHoliday(date) ??
+    marks.find((mark) => mark.date === date && mark.type === "completed")
+  );
+}

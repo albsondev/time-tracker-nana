@@ -34,7 +34,12 @@ export type CalendarDayStatus =
   | "completed"
   | "empty";
 
-export type DayMarkType = "holiday" | "excluded" | "medical_leave" | "completed";
+export type DayMarkType =
+  | "holiday"
+  | "working_day"
+  | "excluded"
+  | "medical_leave"
+  | "completed";
 
 export type DayMark = {
   id: string;
