@@ -1,7 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppProviders } from "@/app/providers";
-import { NanaPointApp } from "./NanaPointApp";
+import {
+  getCalendarBalanceIndicator,
+  NanaPointApp,
+} from "./NanaPointApp";
 
 function renderApp() {
   return render(
@@ -33,4 +36,35 @@ describe("NanaPointApp", () => {
     expect(screen.queryByRole("button", { name: /modo/i })).not.toBeInTheDocument();
     expect(screen.getByText(/o acesso ainda não está disponível/i)).toBeInTheDocument();
   }, 15_000);
+
+  it("shows worked-holiday hours as a positive calendar credit", () => {
+    const indicator = getCalendarBalanceIndicator({
+      date: "2026-10-12",
+      day: 12,
+      entries: [
+        {
+          id: "entry-1",
+          userId: "user-test",
+          occurredAt: "2026-10-12T08:15:00-03:00",
+          type: "arrival",
+        },
+      ],
+      breaks: [],
+      mark: {
+        id: "worked-holiday-1",
+        userId: "user-test",
+        date: "2026-10-12",
+        type: "worked_holiday",
+      },
+      balanceMinutes: 7 * 60 + 7,
+      workedMinutes: 7 * 60 + 7,
+      status: "exceeded",
+      dayStatus: "closed",
+    } as Parameters<typeof getCalendarBalanceIndicator>[0]);
+
+    expect(indicator).toMatchObject({
+      direction: "up",
+      label: "+7h 7min",
+    });
+  });
 });

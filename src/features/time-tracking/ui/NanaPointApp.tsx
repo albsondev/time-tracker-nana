@@ -2050,8 +2050,11 @@ function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
   return { label: day.entries.length > 0 || day.breaks.length > 0 ? "Ok" : "", bg: "#f7f6f3", border: "#efebe4", accent: "#64748b", chip: "#ffffff" };
 }
 
-function getCalendarBalanceIndicator(day: CalendarDayItem) {
-  const hasBlockingMark = day.mark && day.mark.type !== "completed";
+export function getCalendarBalanceIndicator(day: CalendarDayItem) {
+  const hasBlockingMark =
+    day.mark &&
+    day.mark.type !== "completed" &&
+    day.mark.type !== "worked_holiday";
 
   if (!hasCalendarDayActivity(day) || hasBlockingMark || day.status === "pending") {
     return null;
