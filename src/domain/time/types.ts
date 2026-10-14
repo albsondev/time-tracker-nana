@@ -36,6 +36,7 @@ export type CalendarDayStatus =
 
 export type DayMarkType =
   | "holiday"
+  | "worked_holiday"
   | "working_day"
   | "excluded"
   | "medical_leave"

@@ -25,6 +25,15 @@ describe("day marks and national holidays", () => {
     expect(dayMark).toBeUndefined();
   });
 
+  it("preserves a worked-holiday mark over an automatic national holiday", () => {
+    const dayMark = getDayMarkForDate(
+      [mark("2026-10-12", "worked_holiday")],
+      "2026-10-12",
+    );
+
+    expect(dayMark?.type).toBe("worked_holiday");
+  });
+
   it("keeps the override effective while a stored holiday is being cleaned up", () => {
     const dayMark = getDayMarkForDate(
       [mark("2026-10-12", "working_day"), mark("2026-10-12", "holiday")],

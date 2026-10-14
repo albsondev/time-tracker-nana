@@ -211,7 +211,9 @@ function recordMatchesSearch(
     formatDatePtBr(day.date),
     formatWeekdayLongPtBr(day.date),
     statusLabels[day.status],
-    day.mark?.type === "holiday" ? "feriado" : "",
+    day.mark?.type === "holiday" || day.mark?.type === "worked_holiday"
+      ? "feriado feriado trabalhado"
+      : "",
     day.mark?.type === "excluded" ? "dia limpo ignorado removido contabilização" : "",
     day.mark?.type === "medical_leave"
       ? "atestado médico declaração médica ausência justificada consulta médica"
@@ -1374,7 +1376,9 @@ function TodayView({
             const isPast = item.date < summary.date;
             const daySummary = item.summary;
             const hasMedicalLeave = daySummary?.mark?.type === "medical_leave";
-            const hasHoliday = daySummary?.mark?.type === "holiday";
+            const hasHoliday =
+              daySummary?.mark?.type === "holiday" ||
+              daySummary?.mark?.type === "worked_holiday";
             const showBalanceIcon =
               Boolean(daySummary) &&
               isPast &&
@@ -1488,8 +1492,10 @@ function TodayView({
                     <Chip
                       label={selectedDay.mark?.type === "medical_leave"
                         ? "Atestado"
-                        : selectedDay.mark?.type === "holiday"
-                          ? "Feriado"
+                        : selectedDay.mark?.type === "worked_holiday"
+                          ? "Feriado trabalhado"
+                          : selectedDay.mark?.type === "holiday"
+                            ? "Feriado"
                           : statusLabels[selectedDay.status]}
                       size="small"
                       sx={{
@@ -1995,6 +2001,10 @@ function hasCalendarDayActivity(day: CalendarDayItem) {
 function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
   if (day.mark?.type === "medical_leave") {
     return { label: "Atestado", bg: "#fff1f2", border: "#fecdd3", accent: "#be123c", chip: "#ffe4e6" };
+  }
+
+  if (day.mark?.type === "worked_holiday") {
+    return { label: "Feriado trabalhado", bg: "#f5f3ff", border: "#c4b5fd", accent: "#6d28d9", chip: "#ede9fe" };
   }
 
   if (day.mark?.type === "holiday") {
@@ -2678,6 +2688,11 @@ function CalendarDayTooltip({
           Feriado: {day.mark.note ?? "marcado"}
         </Typography>
       )}
+      {day.mark?.type === "worked_holiday" && (
+        <Typography sx={{ color: "#ddd6fe", fontWeight: 800, fontSize: "0.78rem" }}>
+          Feriado trabalhado: todas as horas contam como crédito
+        </Typography>
+      )}
       {day.mark?.type === "excluded" && (
         <Typography sx={{ color: "#e2e8f0", fontWeight: 800, fontSize: "0.78rem" }}>
           Dia limpo: não entra na contabilização
@@ -2729,6 +2744,7 @@ function DayPopoverContent({
 }) {
   const hasRecords = day.entries.length > 0 || day.breaks.length > 0;
   const isHoliday = day.mark?.type === "holiday";
+  const isWorkedHoliday = day.mark?.type === "worked_holiday";
   const isExcluded = day.mark?.type === "excluded";
   const isMedicalLeave = day.mark?.type === "medical_leave";
   const isCompleted = isCompletedWithoutDailyTarget(day);
@@ -2745,7 +2761,7 @@ function DayPopoverContent({
         ? "#be123c"
       : isCompleted
         ? "#047857"
-      : isHoliday
+      : isHoliday || isWorkedHoliday
       ? "#7c3aed"
       : day.status === "empty"
       ? nanaColors.muted
@@ -2768,6 +2784,8 @@ function DayPopoverContent({
       ? "Atestado médico"
     : isCompleted
       ? "Dia concluído"
+    : isWorkedHoliday
+      ? "Feriado trabalhado"
     : isHoliday
       ? "Feriado"
       : statusLabels[day.dayStatus];
@@ -2777,6 +2795,8 @@ function DayPopoverContent({
     ? "Não contabiliza este dia"
     : isMedicalLeave
       ? "Ausência justificada"
+    : isWorkedHoliday
+      ? "Todas as horas contam como crédito"
     : isCompleted
       ? "Conta como saldo semanal"
     : day.balanceMinutes === 0
@@ -2847,10 +2867,10 @@ function DayPopoverContent({
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
               {formatWeekdayLongPtBr(day.date)} · {formatDatePtBr(day.date)}
             </Typography>
-            {isHoliday && (
+            {(isHoliday || isWorkedHoliday) && (
               <Chip
                 icon={<EventBusyRoundedIcon fontSize="small" />}
-                label="Feriado"
+                label={isWorkedHoliday ? "Feriado trabalhado · horas em crédito" : "Feriado"}
                 size="small"
                 sx={{
                   mt: 1,
@@ -3262,8 +3282,8 @@ function DayPopoverContent({
             transition={{ duration: 0.2 }}
             sx={{
               borderRadius: "10px",
-              border: `1px solid ${isHoliday ? "#c4b5fd" : nanaColors.line}`,
-              bgcolor: isHoliday ? "#f5f3ff" : "#ffffff",
+              border: `1px solid ${isHoliday || isWorkedHoliday ? "#c4b5fd" : nanaColors.line}`,
+              bgcolor: isHoliday || isWorkedHoliday ? "#f5f3ff" : "#ffffff",
               p: 1.25,
             }}
           >
@@ -3273,24 +3293,34 @@ function DayPopoverContent({
             >
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>
-                  Feriado
+                  {isWorkedHoliday ? "Feriado trabalhado" : "Feriado"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {isHoliday
-                    ? "Ao remover, a data volta a contar como dia útil."
-                    : "Marque a data para aparecer nos resumos como feriado."}
+                  {isWorkedHoliday
+                    ? "Todas as horas registradas contam como crédito. Remova a marca para voltar à jornada normal."
+                    : isHoliday
+                      ? hasRecords
+                        ? "Ao remover, todas as horas registradas serão creditadas como feriado trabalhado."
+                        : "Ao remover, a data volta a contar como dia útil."
+                      : "Marque a data para aparecer nos resumos como feriado."}
                 </Typography>
               </Box>
               <Button
-                color={isHoliday ? "warning" : "secondary"}
+                color={isHoliday || isWorkedHoliday ? "warning" : "secondary"}
                 disabled={isSaving}
                 onClick={toggleHoliday}
                 size="small"
                 startIcon={<EventBusyRoundedIcon fontSize="small" />}
                 sx={{ borderRadius: "8px", whiteSpace: "nowrap" }}
-                variant={isHoliday ? "outlined" : "contained"}
+                variant={isHoliday || isWorkedHoliday ? "outlined" : "contained"}
               >
-                {isSaving ? "Salvando..." : isHoliday ? "Remover" : "Marcar"}
+                {isSaving
+                  ? "Salvando..."
+                  : isWorkedHoliday
+                    ? "Remover marca"
+                    : isHoliday
+                      ? "Remover feriado"
+                      : "Marcar feriado"}
               </Button>
             </Stack>
           </Box>
@@ -3996,6 +4026,14 @@ function getHourBankDayTone(day: DailySummary) {
     };
   }
 
+  if (day.mark?.type === "worked_holiday") {
+    return {
+      label: "Feriado trabalhado",
+      accent: "#6d28d9",
+      badge: "#ede9fe",
+    };
+  }
+
   if (day.mark?.type === "holiday") {
     return {
       label: "Feriado",
@@ -4053,6 +4091,7 @@ function HourBankDayTile({ day, index }: { day: DailySummary; index: number }) {
         : `Saldo ${minutesToHoursLabel(day.balanceMinutes)}`;
   const workedLabel =
     (day.mark?.type === "holiday" ||
+      day.mark?.type === "worked_holiday" ||
       day.mark?.type === "excluded" ||
       day.mark?.type === "medical_leave") &&
     day.workedMinutes === 0
@@ -4172,6 +4211,10 @@ function getHourBankDetailLabel(day: DailySummary) {
       : "Dia limpo · registros preservados";
   }
 
+  if (day.mark?.type === "worked_holiday") {
+    return `Feriado trabalhado · ${minutesToHoursLabel(day.workedMinutes)} em crédito`;
+  }
+
   if (day.mark?.type === "holiday" && day.entries.length === 0 && day.breaks.length === 0) {
     return "Feriado";
   }
@@ -4258,7 +4301,8 @@ function HistoryView({
       (limitFilter === "complete" && day.status === "closed") ||
       (limitFilter === "edited" &&
         [...day.entries, ...day.breaks].some((entry) => entry.isModified)) ||
-      (limitFilter === "holiday" && day.mark?.type === "holiday") ||
+      (limitFilter === "holiday" &&
+        (day.mark?.type === "holiday" || day.mark?.type === "worked_holiday")) ||
       (limitFilter === "excluded" && day.mark?.type === "excluded") ||
       (limitFilter === "medical_leave" && day.mark?.type === "medical_leave");
 
@@ -4764,7 +4808,8 @@ function HistoryDayCard({
   const lunchStart = sortedEntries.find((entry) => entry.type === "lunch_start");
   const lunchEnd = sortedEntries.find((entry) => entry.type === "lunch_end");
   const hasEdits = [...day.entries, ...day.breaks].some((entry) => entry.isModified);
-  const isHoliday = day.mark?.type === "holiday";
+  const isHoliday =
+    day.mark?.type === "holiday" || day.mark?.type === "worked_holiday";
   const isExcluded = day.mark?.type === "excluded";
   const isMedicalLeave = day.mark?.type === "medical_leave";
   const canCloseDay = canCloseEntriesDirectly(day.entries);

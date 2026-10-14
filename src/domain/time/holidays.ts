@@ -90,6 +90,12 @@ export function getDayMarkForDate(
 
   if (medicalLeaveMark) return medicalLeaveMark;
 
+  const workedHolidayMark = marks.find(
+    (mark) => mark.date === date && mark.type === "worked_holiday",
+  );
+
+  if (workedHolidayMark) return workedHolidayMark;
+
   const workingDayOverride = marks.some(
     (mark) => mark.date === date && mark.type === "working_day",
   );

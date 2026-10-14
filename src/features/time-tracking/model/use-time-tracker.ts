@@ -130,6 +130,7 @@ function getRegisteredDates(
 function getCalendarStatus(summary: DailySummary, todayKey: string): CalendarDayStatus {
   if (summary.mark?.type === "excluded") return "excluded";
   if (summary.mark?.type === "medical_leave") return "medical_leave";
+  if (summary.mark?.type === "worked_holiday") return "exceeded";
   if (summary.mark?.type === "holiday") return "holiday";
   if (isCompletedWithoutDailyTarget(summary)) return "completed";
   if (summary.date === todayKey) return "today";
@@ -557,33 +558,47 @@ export function useTimeTracker(params: {
   async function toggleHoliday(date: string) {
     if (!params.supabase || !params.userId) return;
 
-    const existingMark = marks.find(
-      (mark) => mark.date === date && mark.type === "holiday",
-    );
+    const currentMark = getDayMarkForDate(marks, date);
     const hasWorkingDayOverride = marks.some(
       (mark) => mark.date === date && mark.type === "working_day",
     );
-    const isHoliday = getDayMarkForDate(marks, date)?.type === "holiday";
+    const hasWorkedTime = entries.some(
+      (entry) => toDateKey(new Date(entry.occurredAt)) === date,
+    ) || breaks.some((entry) => entry.date === date);
 
     setState("loading");
     setError(null);
 
     try {
-      if (isHoliday) {
+      if (currentMark?.type === "holiday") {
+        const markType = hasWorkedTime ? "worked_holiday" : "working_day";
+        await upsertDayMark(params.supabase, {
+          userId: params.userId,
+          date,
+          type: markType,
+          note:
+            markType === "worked_holiday"
+              ? "Feriado trabalhado: todas as horas registradas contam como crédito."
+              : "Dia útil: substitui o feriado nacional automático.",
+        });
+
+        await deleteDayMark(params.supabase, {
+          userId: params.userId,
+          date,
+          type: "holiday",
+        });
+      } else if (currentMark?.type === "worked_holiday") {
+        await deleteDayMark(params.supabase, {
+          userId: params.userId,
+          date,
+          type: "worked_holiday",
+        });
         if (getNationalHoliday(date)) {
           await upsertDayMark(params.supabase, {
             userId: params.userId,
             date,
             type: "working_day",
             note: "Dia útil: substitui o feriado nacional automático.",
-          });
-        }
-
-        if (existingMark) {
-          await deleteDayMark(params.supabase, {
-            userId: params.userId,
-            date,
-            type: "holiday",
           });
         }
       } else {
@@ -610,6 +625,12 @@ export function useTimeTracker(params: {
             type: "working_day",
           });
         }
+
+        await deleteDayMark(params.supabase, {
+          userId: params.userId,
+          date,
+          type: "worked_holiday",
+        });
       }
 
       await reload();

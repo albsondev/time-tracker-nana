@@ -67,6 +67,7 @@ function createEmptyDaySummary(date: string): DailySummary {
 function isNonWorkingMark(mark?: DayMark) {
   return (
     mark?.type === "holiday" ||
+    mark?.type === "worked_holiday" ||
     mark?.type === "excluded" ||
     mark?.type === "medical_leave"
   );

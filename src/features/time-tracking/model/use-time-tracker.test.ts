@@ -95,7 +95,7 @@ describe("useTimeTracker holiday overrides", () => {
     vi.clearAllMocks();
   });
 
-  it("replaces a persisted holiday with a workday and keeps the actual hours after reload", async () => {
+  it("credits every worked minute when removing a persisted holiday with time records", async () => {
     persistedMarks = [
       {
         id: "holiday-2026-10-12",
@@ -125,20 +125,20 @@ describe("useTimeTracker holiday overrides", () => {
     expect(repository.upsertDayMark).toHaveBeenCalledWith(supabase, {
       userId,
       date,
-      type: "working_day",
-      note: "Dia útil: substitui o feriado nacional automático.",
+      type: "worked_holiday",
+      note: "Feriado trabalhado: todas as horas registradas contam como crédito.",
     });
     expect(repository.deleteDayMark).toHaveBeenCalledWith(supabase, {
       userId,
       date,
       type: "holiday",
     });
-    expect(selectedDay?.mark).toBeUndefined();
+    expect(selectedDay?.mark?.type).toBe("worked_holiday");
     expect(selectedDay?.workedMinutes).toBe(7 * 60 + 7);
-    expect(selectedDay?.balanceMinutes).toBe(67);
+    expect(selectedDay?.balanceMinutes).toBe(7 * 60 + 7);
     expect(result.current.weekWorkedMinutes).toBe(7 * 60 + 7);
-    expect(result.current.weekExpectedMinutes).toBe(30 * 60);
-    expect(result.current.weekReferenceDelta).toBe(-(22 * 60 + 53));
+    expect(result.current.weekExpectedMinutes).toBe(24 * 60);
+    expect(result.current.weekReferenceDelta).toBe(-(16 * 60 + 53));
   });
 
   it("can mark the overridden national holiday again", async () => {
@@ -169,5 +169,37 @@ describe("useTimeTracker holiday overrides", () => {
     expect(
       result.current.calendarDays.find((day) => day.date === date)?.mark?.type,
     ).toBe("holiday");
+  });
+
+  it("returns a worked holiday to a regular workday when its special mark is removed", async () => {
+    persistedMarks = [
+      {
+        id: "worked-holiday-2026-10-12",
+        userId,
+        date,
+        type: "worked_holiday",
+      },
+    ];
+    const { result } = renderHook(() => useTimeTracker({ supabase, userId }));
+
+    await waitFor(() => expect(result.current.state).toBe("ready"));
+    await act(async () => {
+      await result.current.toggleHoliday(date);
+    });
+
+    expect(repository.deleteDayMark).toHaveBeenCalledWith(supabase, {
+      userId,
+      date,
+      type: "worked_holiday",
+    });
+    expect(repository.upsertDayMark).toHaveBeenCalledWith(supabase, {
+      userId,
+      date,
+      type: "working_day",
+      note: "Dia útil: substitui o feriado nacional automático.",
+    });
+    expect(
+      result.current.calendarDays.find((day) => day.date === date)?.mark,
+    ).toBeUndefined();
   });
 });

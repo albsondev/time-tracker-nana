@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateAutomaticWeeklyBankMovements,
   calculateHourBankBalance,
+  calculateWeeklyExpectedMinutes,
   calculateWorkedMinutes,
   getNextEntryType,
   summarizeDay,
@@ -113,6 +114,29 @@ describe("time calculations", () => {
     expect(summary.mark).toBeUndefined();
     expect(summary.workedMinutes).toBe(8 * 60);
     expect(summary.balanceMinutes).toBe(2 * 60);
+  });
+
+  it("credits all worked minutes on a worked holiday without a daily target", () => {
+    const date = "2026-10-12";
+    const mark = getDayMarkForDate(
+      [{ id: "worked-holiday-1", userId, date, type: "worked_holiday" }],
+      date,
+    );
+    const summary = summarizeDay({
+      date,
+      mark,
+      entries: [
+        entry("worked-arrival", "arrival", "2026-10-12T08:15:00-03:00"),
+        entry("worked-lunch-start", "lunch_start", "2026-10-12T12:00:00-03:00"),
+        entry("worked-lunch-end", "lunch_end", "2026-10-12T14:26:00-03:00"),
+        entry("worked-departure", "departure", "2026-10-12T17:48:00-03:00"),
+      ],
+    });
+
+    expect(summary.mark?.type).toBe("worked_holiday");
+    expect(summary.workedMinutes).toBe(7 * 60 + 7);
+    expect(summary.balanceMinutes).toBe(7 * 60 + 7);
+    expect(calculateWeeklyExpectedMinutes([summary])).toBe(0);
   });
 
   it("ignores a cleared day without deleting its records", () => {
