@@ -3650,10 +3650,91 @@ function HourBankView({ tracker }: { tracker: ReturnType<typeof useTimeTracker> 
       : [tracker.hourBankBalance],
   );
   const isBalancePositive = tracker.hourBankBalance >= 0;
+  const weeklyDeltaLabel =
+    tracker.weekReferenceDelta < 0
+      ? `Faltam ${minutesToHoursLabel(Math.abs(tracker.weekReferenceDelta))}`
+      : tracker.weekReferenceDelta > 0
+        ? `${minutesToHoursLabel(tracker.weekReferenceDelta)} extras`
+        : "Meta semanal atingida";
+  const weeklyProgress =
+    tracker.weekExpectedMinutes > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (tracker.weekWorkedMinutes / tracker.weekExpectedMinutes) * 100,
+          ),
+        )
+      : 0;
 
   return (
     <Stack spacing={2}>
       <SectionTitle title="Banco de horas" subtitle="Créditos e débitos semanais" />
+      <Card
+        sx={{
+          border: `1px solid ${nanaColors.line}`,
+          borderRadius: "8px",
+          boxShadow: "0 8px 22px rgba(64, 42, 12, 0.06)",
+        }}
+      >
+        <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+          <Stack spacing={1.15}>
+            <Stack
+              direction="row"
+              sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}
+            >
+              <Typography sx={{ fontWeight: 800 }}>Semana em andamento</Typography>
+              <Chip
+                label="Provisório"
+                size="small"
+                sx={{ bgcolor: "#eef2ff", color: "#4338ca", fontWeight: 800 }}
+              />
+            </Stack>
+            <Typography sx={{ color: "#111827", fontSize: "1.2rem", fontWeight: 900 }}>
+              {minutesToHoursLabel(tracker.weekWorkedMinutes)}
+              <Typography component="span" color="text.secondary" sx={{ fontSize: "0.9rem", fontWeight: 600 }}>
+                {` / ${minutesToHoursLabel(tracker.weekExpectedMinutes)} da meta`}
+              </Typography>
+            </Typography>
+            <Box
+              aria-label={`Progresso semanal: ${weeklyProgress}%`}
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={weeklyProgress}
+              role="progressbar"
+              sx={{
+                bgcolor: "#f1efe9",
+                borderRadius: "999px",
+                height: 8,
+                overflow: "hidden",
+              }}
+            >
+              <Box
+                sx={{
+                  bgcolor: tracker.weekReferenceDelta < 0 ? "#c69b46" : "#16845b",
+                  borderRadius: "inherit",
+                  height: "100%",
+                  transition: "width 220ms ease",
+                  width: `${weeklyProgress}%`,
+                }}
+              />
+            </Box>
+            <Typography
+              sx={{
+                color: tracker.weekReferenceDelta < 0 ? "#9a6a12" : "#047857",
+                fontSize: "0.9rem",
+                fontWeight: 800,
+              }}
+            >
+              {weeklyDeltaLabel}
+            </Typography>
+            <Typography color="text.secondary" variant="body2">
+              As horas registradas já entram no total semanal. O crédito ou débito definitivo
+              aparece no saldo acumulado depois que a semana termina e os registros ficam
+              completos.
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
       {tracker.hasHourBankMovements ? (
         <MotionCard variants={fadeUp} initial="hidden" animate="visible">
           <CardContent sx={{ p: 2.2 }}>

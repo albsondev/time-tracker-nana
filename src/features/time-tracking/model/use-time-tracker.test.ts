@@ -25,13 +25,25 @@ const entries: TimeEntry[] = [
     id: "arrival-1",
     userId,
     type: "arrival",
-    occurredAt: "2026-10-12T08:00:00-03:00",
+    occurredAt: "2026-10-12T08:15:00-03:00",
+  },
+  {
+    id: "lunch-start-1",
+    userId,
+    type: "lunch_start",
+    occurredAt: "2026-10-12T12:00:00-03:00",
+  },
+  {
+    id: "lunch-end-1",
+    userId,
+    type: "lunch_end",
+    occurredAt: "2026-10-12T14:26:00-03:00",
   },
   {
     id: "departure-1",
     userId,
     type: "departure",
-    occurredAt: "2026-10-12T16:00:00-03:00",
+    occurredAt: "2026-10-12T17:48:00-03:00",
   },
 ];
 
@@ -83,13 +95,24 @@ describe("useTimeTracker holiday overrides", () => {
     vi.clearAllMocks();
   });
 
-  it("removes the automatic holiday and preserves the workday and extra after reload", async () => {
+  it("replaces a persisted holiday with a workday and keeps the actual hours after reload", async () => {
+    persistedMarks = [
+      {
+        id: "holiday-2026-10-12",
+        userId,
+        date,
+        type: "holiday",
+        note: "Nossa Senhora Aparecida",
+      },
+    ];
     const { result } = renderHook(() => useTimeTracker({ supabase, userId }));
 
     await waitFor(() => expect(result.current.state).toBe("ready"));
     expect(
       result.current.calendarDays.find((day) => day.date === date)?.mark?.type,
     ).toBe("holiday");
+    expect(result.current.weekWorkedMinutes).toBe(7 * 60 + 7);
+    expect(result.current.weekExpectedMinutes).toBe(24 * 60);
 
     await act(async () => {
       await result.current.toggleHoliday(date);
@@ -105,9 +128,17 @@ describe("useTimeTracker holiday overrides", () => {
       type: "working_day",
       note: "Dia útil: substitui o feriado nacional automático.",
     });
+    expect(repository.deleteDayMark).toHaveBeenCalledWith(supabase, {
+      userId,
+      date,
+      type: "holiday",
+    });
     expect(selectedDay?.mark).toBeUndefined();
-    expect(selectedDay?.workedMinutes).toBe(8 * 60);
-    expect(selectedDay?.balanceMinutes).toBe(2 * 60);
+    expect(selectedDay?.workedMinutes).toBe(7 * 60 + 7);
+    expect(selectedDay?.balanceMinutes).toBe(67);
+    expect(result.current.weekWorkedMinutes).toBe(7 * 60 + 7);
+    expect(result.current.weekExpectedMinutes).toBe(30 * 60);
+    expect(result.current.weekReferenceDelta).toBe(-(22 * 60 + 53));
   });
 
   it("can mark the overridden national holiday again", async () => {
