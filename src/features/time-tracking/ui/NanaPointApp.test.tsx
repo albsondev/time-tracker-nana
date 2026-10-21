@@ -67,4 +67,41 @@ describe("NanaPointApp", () => {
       label: "+7h 7min",
     });
   });
+
+  it("shows hours logged on a manually marked holiday as positive credit", () => {
+    const indicator = getCalendarBalanceIndicator({
+      date: "2026-10-15",
+      day: 15,
+      entries: [
+        {
+          id: "arrival-2026-10-15",
+          userId: "user-test",
+          occurredAt: "2026-10-15T09:37:00-03:00",
+          type: "arrival",
+        },
+        {
+          id: "departure-2026-10-15",
+          userId: "user-test",
+          occurredAt: "2026-10-15T11:06:00-03:00",
+          type: "departure",
+        },
+      ],
+      breaks: [],
+      mark: {
+        id: "holiday-2026-10-15",
+        userId: "user-test",
+        date: "2026-10-15",
+        type: "holiday",
+      },
+      balanceMinutes: 89,
+      workedMinutes: 89,
+      status: "holiday",
+      dayStatus: "closed",
+    } as Parameters<typeof getCalendarBalanceIndicator>[0]);
+
+    expect(indicator).toMatchObject({
+      direction: "up",
+      label: "+1h 29min",
+    });
+  });
 });

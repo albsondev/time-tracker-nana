@@ -96,6 +96,26 @@ describe("time calculations", () => {
     expect(summary.mark?.type).toBe("holiday");
   });
 
+  it("credits all recorded minutes on a manually marked holiday", () => {
+    const date = "2026-10-15";
+    const summary = summarizeDay({
+      date,
+      entries: [
+        entry("holiday-arrival", "arrival", "2026-10-15T09:37:00-03:00"),
+        entry("holiday-departure", "departure", "2026-10-15T11:06:00-03:00"),
+      ],
+      mark: {
+        id: "manual-holiday-2026-10-15",
+        userId,
+        date,
+        type: "holiday",
+      },
+    });
+
+    expect(summary.workedMinutes).toBe(89);
+    expect(summary.balanceMinutes).toBe(89);
+  });
+
   it("counts work on an overridden national holiday toward the daily extra", () => {
     const date = "2026-10-12";
     const mark = getDayMarkForDate(

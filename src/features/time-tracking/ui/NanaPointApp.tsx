@@ -1494,8 +1494,10 @@ function TodayView({
                         ? "Atestado"
                         : selectedDay.mark?.type === "worked_holiday"
                           ? "Feriado trabalhado"
-                          : selectedDay.mark?.type === "holiday"
-                            ? "Feriado"
+                        : selectedDay.mark?.type === "holiday"
+                            ? selectedDay.workedMinutes > 0
+                              ? "Feriado trabalhado"
+                              : "Feriado"
                           : statusLabels[selectedDay.status]}
                       size="small"
                       sx={{
@@ -2008,7 +2010,13 @@ function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
   }
 
   if (day.mark?.type === "holiday") {
-    return { label: "Feriado", bg: "#f5f3ff", border: "#c4b5fd", accent: "#6d28d9", chip: "#ede9fe" };
+    return {
+      label: day.workedMinutes > 0 ? "Feriado trabalhado" : "Feriado",
+      bg: "#f5f3ff",
+      border: "#c4b5fd",
+      accent: "#6d28d9",
+      chip: "#ede9fe",
+    };
   }
 
   if (day.mark?.type === "excluded") {
@@ -2054,7 +2062,8 @@ export function getCalendarBalanceIndicator(day: CalendarDayItem) {
   const hasBlockingMark =
     day.mark &&
     day.mark.type !== "completed" &&
-    day.mark.type !== "worked_holiday";
+    day.mark.type !== "worked_holiday" &&
+    day.mark.type !== "holiday";
 
   if (!hasCalendarDayActivity(day) || hasBlockingMark || day.status === "pending") {
     return null;
@@ -2686,7 +2695,12 @@ function CalendarDayTooltip({
       <Typography sx={{ fontWeight: 900, fontSize: "0.82rem" }}>
         {formatDateFullPtBr(day.date)}
       </Typography>
-      {day.mark?.type === "holiday" && (
+      {day.mark?.type === "holiday" && day.workedMinutes > 0 && (
+        <Typography sx={{ color: "#ddd6fe", fontWeight: 800, fontSize: "0.78rem" }}>
+          Feriado trabalhado: todas as horas contam como crédito
+        </Typography>
+      )}
+      {day.mark?.type === "holiday" && day.workedMinutes === 0 && (
         <Typography sx={{ color: "#ddd6fe", fontWeight: 800, fontSize: "0.78rem" }}>
           Feriado: {day.mark.note ?? "marcado"}
         </Typography>
@@ -2747,7 +2761,10 @@ function DayPopoverContent({
 }) {
   const hasRecords = day.entries.length > 0 || day.breaks.length > 0;
   const isHoliday = day.mark?.type === "holiday";
-  const isWorkedHoliday = day.mark?.type === "worked_holiday";
+  const hasWorkedHolidayMark = day.mark?.type === "worked_holiday";
+  const isWorkedHoliday =
+    hasWorkedHolidayMark ||
+    (day.mark?.type === "holiday" && day.workedMinutes > 0);
   const isExcluded = day.mark?.type === "excluded";
   const isMedicalLeave = day.mark?.type === "medical_leave";
   const isCompleted = isCompletedWithoutDailyTarget(day);
@@ -3299,12 +3316,12 @@ function DayPopoverContent({
                   {isWorkedHoliday ? "Feriado trabalhado" : "Feriado"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {isWorkedHoliday
+                  {hasWorkedHolidayMark
                     ? "Todas as horas registradas contam como crédito. Remova a marca para voltar à jornada normal."
+                    : isHoliday && hasRecords
+                      ? "Este feriado tem horas registradas; confirme para creditar todas como feriado trabalhado."
                     : isHoliday
-                      ? hasRecords
-                        ? "Ao remover, todas as horas registradas serão creditadas como feriado trabalhado."
-                        : "Ao remover, a data volta a contar como dia útil."
+                      ? "Ao remover, a data volta a contar como dia útil."
                       : "Marque a data para aparecer nos resumos como feriado."}
                 </Typography>
               </Box>
@@ -3319,10 +3336,12 @@ function DayPopoverContent({
               >
                 {isSaving
                   ? "Salvando..."
-                  : isWorkedHoliday
+                  : hasWorkedHolidayMark
                     ? "Remover marca"
                     : isHoliday
-                      ? "Remover feriado"
+                      ? hasRecords
+                        ? "Creditar horas"
+                        : "Remover feriado"
                       : "Marcar feriado"}
               </Button>
             </Stack>
@@ -4039,7 +4058,7 @@ function getHourBankDayTone(day: DailySummary) {
 
   if (day.mark?.type === "holiday") {
     return {
-      label: "Feriado",
+      label: day.workedMinutes > 0 ? "Feriado trabalhado" : "Feriado",
       accent: "#6d28d9",
       badge: "#ede9fe",
     };
@@ -4218,8 +4237,10 @@ function getHourBankDetailLabel(day: DailySummary) {
     return `Feriado trabalhado · ${minutesToHoursLabel(day.workedMinutes)} em crédito`;
   }
 
-  if (day.mark?.type === "holiday" && day.entries.length === 0 && day.breaks.length === 0) {
-    return "Feriado";
+  if (day.mark?.type === "holiday") {
+    return day.workedMinutes > 0
+      ? `Feriado trabalhado · ${minutesToHoursLabel(day.workedMinutes)} em crédito`
+      : "Feriado";
   }
 
   if (isCompletedWithoutDailyTarget(day)) {

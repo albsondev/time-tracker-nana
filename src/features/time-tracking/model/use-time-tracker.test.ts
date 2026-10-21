@@ -141,7 +141,7 @@ describe("useTimeTracker holiday overrides", () => {
     expect(result.current.weekReferenceDelta).toBe(-(16 * 60 + 53));
   });
 
-  it("can mark the overridden national holiday again", async () => {
+  it("marks an overridden national holiday as worked when it has time records", async () => {
     persistedMarks = [
       {
         id: "working-day-1",
@@ -168,7 +168,7 @@ describe("useTimeTracker holiday overrides", () => {
     ).toBe(true);
     expect(
       result.current.calendarDays.find((day) => day.date === date)?.mark?.type,
-    ).toBe("holiday");
+    ).toBe("worked_holiday");
   });
 
   it("returns a worked holiday to a regular workday when its special mark is removed", async () => {

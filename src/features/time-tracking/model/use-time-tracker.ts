@@ -612,10 +612,11 @@ export function useTimeTracker(params: {
           date,
           type: "completed",
         });
+        const markType = hasWorkedTime ? "worked_holiday" : "holiday";
         await upsertDayMark(params.supabase, {
           userId: params.userId,
           date,
-          type: "holiday",
+          type: markType,
         });
 
         if (hasWorkingDayOverride) {
@@ -629,7 +630,7 @@ export function useTimeTracker(params: {
         await deleteDayMark(params.supabase, {
           userId: params.userId,
           date,
-          type: "worked_holiday",
+          type: markType === "worked_holiday" ? "holiday" : "worked_holiday",
         });
       }
 
