@@ -47,7 +47,7 @@ const entries: TimeEntry[] = [
   },
 ];
 
-describe("useTimeTracker holiday overrides", () => {
+describe("useTimeTracker", () => {
   let persistedMarks: DayMark[];
 
   beforeEach(() => {
@@ -201,5 +201,57 @@ describe("useTimeTracker holiday overrides", () => {
     expect(
       result.current.calendarDays.find((day) => day.date === date)?.mark,
     ).toBeUndefined();
+  });
+
+  it("shows automatic debits on empty weekdays in a fully missed week", async () => {
+    vi.setSystemTime(new Date(2026, 10, 24, 12));
+    repository.loadUserTimeTrackingSnapshot.mockResolvedValue({
+      entries: [
+        {
+          id: "anchor-arrival",
+          userId,
+          type: "arrival",
+          occurredAt: "2026-11-03T07:30:00-03:00",
+        },
+        {
+          id: "anchor-departure",
+          userId,
+          type: "departure",
+          occurredAt: "2026-11-03T17:00:00-03:00",
+        },
+        {
+          id: "later-arrival",
+          userId,
+          type: "arrival",
+          occurredAt: "2026-11-16T07:30:00-03:00",
+        },
+        {
+          id: "later-departure",
+          userId,
+          type: "departure",
+          occurredAt: "2026-11-16T17:00:00-03:00",
+        },
+      ],
+      breaks: [],
+      marks: [],
+      movements: [],
+    });
+    const { result } = renderHook(() => useTimeTracker({ supabase, userId }));
+
+    await waitFor(() => expect(result.current.state).toBe("ready"));
+
+    const missedMonday = result.current.calendarDays.find(
+      (day) => day.date === "2026-11-09",
+    );
+    const absentWeekMovement = result.current.movements.find(
+      (movement) => movement.date === "2026-11-15",
+    );
+
+    expect(missedMonday).toMatchObject({
+      status: "negative",
+      balanceMinutes: -6 * 60,
+      automaticDebitMinutes: 6 * 60,
+    });
+    expect(absentWeekMovement?.minutesDelta).toBe(-30 * 60);
   });
 });

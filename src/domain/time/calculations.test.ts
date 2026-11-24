@@ -414,6 +414,70 @@ describe("time calculations", () => {
     expect(movements[0].details?.at(4)?.workedMinutes).toBe(0);
   });
 
+  it("debits 30 hours for a fully unrecorded week between active weeks", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-11-03",
+          entries: [
+            entry("first-week-arrival", "arrival", "2026-11-03T07:30:00-03:00"),
+            entry("first-week-departure", "departure", "2026-11-03T17:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-11-16",
+          entries: [
+            entry("next-week-arrival", "arrival", "2026-11-16T07:30:00-03:00"),
+            entry("next-week-departure", "departure", "2026-11-16T17:00:00-03:00"),
+          ],
+        }),
+      ],
+      undefined,
+      new Date("2026-11-24T12:00:00-03:00"),
+    );
+
+    const absentWeek = movements.find(
+      (movement) => movement.date === "2026-11-15",
+    );
+
+    expect(absentWeek?.minutesDelta).toBe(-30 * 60);
+    expect(absentWeek?.details?.map((day) => day.date)).toEqual([
+      "2026-11-09",
+      "2026-11-10",
+      "2026-11-11",
+      "2026-11-12",
+      "2026-11-13",
+    ]);
+    expect(absentWeek?.details?.every((day) => day.workedMinutes === 0)).toBe(true);
+    expect(
+      movements.some((movement) => movement.date === "2026-11-01"),
+    ).toBe(false);
+  });
+
+  it("reduces an entirely absent week target for a weekday holiday", () => {
+    const movements = calculateAutomaticWeeklyBankMovements(
+      [
+        summarizeDay({
+          date: "2026-11-03",
+          entries: [
+            entry("active-arrival", "arrival", "2026-11-03T07:30:00-03:00"),
+            entry("active-departure", "departure", "2026-11-03T17:00:00-03:00"),
+          ],
+        }),
+        summarizeDay({
+          date: "2026-11-09",
+          entries: [],
+          mark: mark("holiday-1", "2026-11-09", "holiday"),
+        }),
+      ],
+      undefined,
+      new Date("2026-11-16T12:00:00-03:00"),
+    );
+
+    expect(movements.find((movement) => movement.date === "2026-11-15")?.minutesDelta)
+      .toBe(-24 * 60);
+  });
+
   it("keeps the 30 hour weekly target when a short Friday is completed", () => {
     const movements = calculateAutomaticWeeklyBankMovements(
       [

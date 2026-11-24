@@ -58,6 +58,7 @@ describe("NanaPointApp", () => {
       },
       balanceMinutes: 7 * 60 + 7,
       workedMinutes: 7 * 60 + 7,
+      automaticDebitMinutes: 0,
       status: "exceeded",
       dayStatus: "closed",
     } as Parameters<typeof getCalendarBalanceIndicator>[0]);
@@ -95,6 +96,7 @@ describe("NanaPointApp", () => {
       },
       balanceMinutes: 89,
       workedMinutes: 89,
+      automaticDebitMinutes: 0,
       status: "holiday",
       dayStatus: "closed",
     } as Parameters<typeof getCalendarBalanceIndicator>[0]);
@@ -102,6 +104,26 @@ describe("NanaPointApp", () => {
     expect(indicator).toMatchObject({
       direction: "up",
       label: "+1h 29min",
+    });
+  });
+
+  it("shows the daily debit on an automatically charged empty weekday", () => {
+    const indicator = getCalendarBalanceIndicator({
+      date: "2026-11-09",
+      day: 9,
+      entries: [],
+      breaks: [],
+      mark: undefined,
+      balanceMinutes: -6 * 60,
+      workedMinutes: 0,
+      automaticDebitMinutes: 6 * 60,
+      status: "negative",
+      dayStatus: "not_started",
+    } as Parameters<typeof getCalendarBalanceIndicator>[0]);
+
+    expect(indicator).toMatchObject({
+      direction: "down",
+      label: "-6h",
     });
   });
 });

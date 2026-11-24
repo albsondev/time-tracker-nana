@@ -1997,7 +1997,12 @@ function getCalendarLeadingSlots(date: Date) {
 }
 
 function hasCalendarDayActivity(day: CalendarDayItem) {
-  return day.entries.length > 0 || day.breaks.length > 0 || Boolean(day.mark);
+  return (
+    day.entries.length > 0 ||
+    day.breaks.length > 0 ||
+    Boolean(day.mark) ||
+    day.automaticDebitMinutes > 0
+  );
 }
 
 function getCalendarCellTone(day: CalendarDayItem, todayKey?: string) {
@@ -2728,6 +2733,11 @@ function CalendarDayTooltip({
             ? ` · último ${formatTimePtBr(lastEntry.occurredAt)}`
             : ""}
           {day.breaks.length > 0 ? ` · ${day.breaks.length} pausas` : ""}
+        </Typography>
+      )}
+      {day.automaticDebitMinutes > 0 && (
+        <Typography sx={{ fontSize: "0.78rem", mt: 0.35, fontWeight: 800 }}>
+          Ausência contabilizada no débito semanal: -{minutesToHoursLabel(day.automaticDebitMinutes)}
         </Typography>
       )}
     </Box>

@@ -127,12 +127,17 @@ function getRegisteredDates(
   ).sort((first, second) => second.localeCompare(first));
 }
 
-function getCalendarStatus(summary: DailySummary, todayKey: string): CalendarDayStatus {
+function getCalendarStatus(
+  summary: DailySummary,
+  todayKey: string,
+  automaticDebitMinutes: number,
+): CalendarDayStatus {
   if (summary.mark?.type === "excluded") return "excluded";
   if (summary.mark?.type === "medical_leave") return "medical_leave";
   if (summary.mark?.type === "worked_holiday") return "exceeded";
   if (summary.mark?.type === "holiday") return "holiday";
   if (isCompletedWithoutDailyTarget(summary)) return "completed";
+  if (automaticDebitMinutes > 0) return "negative";
   if (summary.date === todayKey) return "today";
   if (summary.entries.length === 0) return "empty";
   if (summary.status !== "closed") return "pending";
@@ -315,6 +320,28 @@ export function useTimeTracker(params: {
     [breaks, entries, marks, today],
   );
 
+  const automaticHourBankMovements = useMemo(
+    () => calculateAutomaticWeeklyBankMovements(historySummaries, undefined, today),
+    [historySummaries, today],
+  );
+
+  const automaticDebitMinutesByDate = useMemo(
+    () =>
+      new Map(
+        automaticHourBankMovements.flatMap((movement) =>
+          (movement.details ?? [])
+            .filter(
+              (day) =>
+                day.entries.length === 0 &&
+                day.breaks.length === 0 &&
+                day.balanceMinutes < 0,
+            )
+            .map((day) => [day.date, Math.abs(day.balanceMinutes)] as const),
+        ),
+      ),
+    [automaticHourBankMovements],
+  );
+
   const hasTodayEntries = todayEntries.length > 0;
   const hasWeekEntries = weekDailySummaries.some((summary) => summary.entries.length > 0);
   const weekWorkedMinutes = useMemo(
@@ -334,15 +361,20 @@ export function useTimeTracker(params: {
       calendarDailySummaries.map((summary) => ({
         date: summary.date,
         day: Number(summary.date.slice(8, 10)),
-        status: getCalendarStatus(summary, todayKey),
+        status: getCalendarStatus(
+          summary,
+          todayKey,
+          automaticDebitMinutesByDate.get(summary.date) ?? 0,
+        ),
         workedMinutes: summary.workedMinutes,
         balanceMinutes: summary.balanceMinutes,
+        automaticDebitMinutes: automaticDebitMinutesByDate.get(summary.date) ?? 0,
         entries: summary.entries,
         breaks: summary.breaks,
         mark: summary.mark,
         dayStatus: summary.status,
       })),
-    [calendarDailySummaries, todayKey],
+    [automaticDebitMinutesByDate, calendarDailySummaries, todayKey],
   );
 
   function moveCalendarMonth(monthDelta: number) {
@@ -360,11 +392,6 @@ export function useTimeTracker(params: {
     currentMonth.setHours(12, 0, 0, 0);
     setCalendarMonth(currentMonth);
   }
-
-  const automaticHourBankMovements = useMemo(
-    () => calculateAutomaticWeeklyBankMovements(historySummaries, undefined, today),
-    [historySummaries, today],
-  );
 
   const hourBankMovements = useMemo(
     () =>

@@ -46,6 +46,13 @@ function getWeekEndKey(weekStartsAt: string) {
   return toDateKey(weekEnd);
 }
 
+function addDaysToDateKey(dateKey: string, days: number) {
+  const date = new Date(`${dateKey}T12:00:00`);
+  date.setDate(date.getDate() + days);
+
+  return toDateKey(date);
+}
+
 function getWeekdayKeys(weekStartsAt: string) {
   const weekStart = new Date(`${weekStartsAt}T12:00:00`);
 
@@ -246,6 +253,18 @@ export function calculateAutomaticWeeklyBankMovements(
     },
     {},
   );
+  const observedWeekStarts = Object.keys(groupedDays).sort();
+
+  if (observedWeekStarts.length === 0) return [];
+
+  const firstObservedWeek = observedWeekStarts[0];
+  let weekStartsAt = firstObservedWeek;
+  const todayKey = toDateKey(now);
+
+  while (getWeekEndKey(weekStartsAt) < todayKey) {
+    groupedDays[weekStartsAt] ??= [];
+    weekStartsAt = addDaysToDateKey(weekStartsAt, 7);
+  }
 
   return Object.entries(groupedDays)
     .reduce<HourBankMovement[]>((weeklyMovements, [weekStartsAt, weekDays]) => {
@@ -263,9 +282,11 @@ export function calculateAutomaticWeeklyBankMovements(
           day.status !== "closed",
       );
       const weekEndsAt = getWeekEndKey(weekStartsAt);
-      const todayKey = toDateKey(now);
-
-      if (!hasWorkRecords || hasPendingRecords || weekEndsAt >= todayKey) {
+      if (
+        (weekStartsAt === firstObservedWeek && !hasWorkRecords) ||
+        hasPendingRecords ||
+        weekEndsAt >= todayKey
+      ) {
         return weeklyMovements;
       }
 
